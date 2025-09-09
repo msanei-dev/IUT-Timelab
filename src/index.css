@@ -1,0 +1,29 @@
+/* Import Estedad Font */
+@font-face {
+  font-family: 'Estedad';
+  src: url('./Estedad-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+body {
+  font-family: 'Estedad', sans-serif;
+  margin: 0;
+  background: #f8f9fa;
+  direction: rtl; /* برای پشتیبانی بهتر از فارسی */
+}
+
+/* کلاس‌های مختلف وزن فونت */
+.font-thin { font-weight: 100; }
+.font-light { font-weight: 300; }
+.font-normal { font-weight: 400; }
+.font-medium { font-weight: 500; }
+.font-semibold { font-weight: 600; }
+.font-bold { font-weight: 700; }
+.font-black { font-weight: 900; }
+
+button:disabled {
+  background: #aaa !important;
+  cursor: not-allowed !important;
+}

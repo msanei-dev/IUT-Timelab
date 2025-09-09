@@ -1,0 +1,54 @@
+{
+  "courses": [
+    {
+      "courseName": "ریاضي عمومي 2",
+      "courseCode": "1914107",
+      "units": 3,
+      "sections": [
+        {
+          "sectionCode": "01",
+          "professor": {
+            "name": "آقائي فروشاني مجتبي",
+            "takesAttendance": true,
+            "teachingQuality": "good"
+          },
+          "schedule": [
+            { "day": "Saturday", "start": "10:00", "end": "12:00" },
+            { "day": "Monday", "start": "10:00", "end": "12:00" }
+          ]
+        },
+        {
+          "sectionCode": "02",
+          "professor": {
+            "name": "رمضاني بوزاني محدثه",
+            "takesAttendance": false,
+            "teachingQuality": "average"
+          },
+          "schedule": [
+            { "day": "Sunday", "start": "10:00", "end": "12:00" },
+            { "day": "Tuesday", "start": "10:00", "end": "12:00" }
+          ]
+        }
+      ]
+    },
+    {
+      "courseName": "مقاومت مصالح 1",
+      "courseCode": "1512211",
+      "units": 3,
+      "sections": [
+        {
+          "sectionCode": "01",
+          "professor": {
+            "name": "استاد نمونه",
+            "takesAttendance": false,
+            "teachingQuality": "excellent"
+          },
+          "schedule": [
+            { "day": "Wednesday", "start": "14:00", "end": "16:00" },
+            { "day": "Monday", "start": "08:00", "end": "10:00" }
+          ]
+        }
+      ]
+    }
+  ]
+}
