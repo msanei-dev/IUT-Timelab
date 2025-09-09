@@ -91,75 +91,184 @@ const DataInput: React.FC<Props> = ({ onDataSubmit }) => {
     return (
       <button 
         onClick={() => setIsVisible(true)}
-        className="font-medium"
+        className="btn-modern btn-primary font-medium glass-card"
         style={{
           margin: '8px 0',
-          padding: '12px 20px',
+          padding: '16px 24px',
           fontSize: '1rem',
-          border: 'none',
-          background: '#4caf50',
-          color: '#fff',
-          borderRadius: '8px',
-          cursor: 'pointer',
-          width: '100%'
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '12px',
+          transition: 'all 0.3s ease'
         }}
       >
+        <svg className="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M12 5v14M5 12h14"/>
+        </svg>
         افزودن داده‌های جدید
       </button>
     );
   }
 
   return (
-    <div style={{ margin: '16px 0', padding: '16px', border: '1px solid #ddd', borderRadius: '8px', background: '#f9f9f9' }}>
-      <h3 className="font-bold" style={{ marginBottom: '12px' }}>ورود داده‌های درسی</h3>
-      <textarea
-        value={inputData}
-        onChange={(e) => setInputData(e.target.value)}
-        placeholder="داده‌های جدولی را از اکسل کپی کرده و اینجا پیست کنید..."
-        style={{
-          width: '100%',
-          height: '200px',
-          padding: '12px',
-          border: '1px solid #ccc',
-          borderRadius: '4px',
-          fontSize: '0.9rem',
-          fontFamily: 'Estedad, sans-serif',
-          resize: 'vertical',
-          boxSizing: 'border-box'
-        }}
-      />
-      <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+    <div className="glass-card modern-form" style={{ 
+      margin: '16px 0', 
+      padding: '24px', 
+      borderRadius: '16px',
+      animation: 'fadeInUp 0.3s ease',
+      background: 'var(--glass-bg)',
+      backdropFilter: 'blur(10px)',
+      border: '1px solid var(--glass-border)'
+    }}>
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: '12px', 
+        marginBottom: '20px' 
+      }}>
+        <div className="glass" style={{
+          padding: '8px',
+          borderRadius: '8px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'var(--primary-gradient)'
+        }}>
+          <svg className="icon text-white" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14,2 14,8 20,8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+            <polyline points="10,9 9,9 8,9"/>
+          </svg>
+        </div>
+        <h3 className="font-bold text-text" style={{ 
+          fontSize: '1.25rem',
+          margin: 0,
+          color: 'var(--text-color)'
+        }}>
+          ورود داده‌های درسی
+        </h3>
+      </div>
+      
+      <div className="modern-input-group" style={{ position: 'relative', marginBottom: '20px' }}>
+        <textarea
+          value={inputData}
+          onChange={(e) => setInputData(e.target.value)}
+          placeholder="داده‌های جدولی را از اکسل کپی کرده و اینجا پیست کنید..."
+          className="modern-textarea"
+          style={{
+            width: '100%',
+            height: '200px',
+            padding: '16px',
+            borderRadius: '12px',
+            fontSize: '0.95rem',
+            fontFamily: 'Estedad, sans-serif',
+            resize: 'vertical',
+            boxSizing: 'border-box',
+            background: 'var(--input-bg)',
+            color: 'var(--text-color)',
+            outline: 'none',
+            transition: 'all 0.3s ease',
+            border: '1px solid var(--glass-border)'
+          }}
+          onFocus={(e) => {
+            e.target.style.borderColor = 'var(--primary-color)';
+            e.target.style.boxShadow = '0 0 0 3px rgba(44, 83, 100, 0.1)';
+          }}
+          onBlur={(e) => {
+            e.target.style.borderColor = 'var(--glass-border)';
+            e.target.style.boxShadow = 'none';
+          }}
+        />
+        <div style={{
+          position: 'absolute',
+          bottom: '12px',
+          left: '12px',
+          fontSize: '0.75rem',
+          color: 'var(--text-secondary)',
+          opacity: inputData.length > 0 ? 1 : 0,
+          transition: 'opacity 0.3s ease'
+        }}>
+          {inputData.length} کاراکتر
+        </div>
+      </div>
+      
+      <div style={{ 
+        display: 'flex', 
+        gap: '12px', 
+        flexWrap: 'wrap'
+      }}>
         <button
           onClick={handleSubmit}
           disabled={!inputData.trim()}
-          className="font-medium"
+          className={`btn-modern ${inputData.trim() ? 'btn-success' : 'btn-disabled'} font-medium`}
           style={{
-            padding: '10px 16px',
-            border: 'none',
-            background: inputData.trim() ? '#4caf50' : '#ccc',
-            color: '#fff',
-            borderRadius: '4px',
+            padding: '12px 20px',
+            borderRadius: '8px',
             cursor: inputData.trim() ? 'pointer' : 'not-allowed',
-            flex: 1
+            flex: 1,
+            minWidth: '120px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            transition: 'all 0.3s ease'
           }}
         >
+          <svg className="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+            <polyline points="17,21 17,13 7,13 7,21"/>
+            <polyline points="7,3 7,8 15,8"/>
+          </svg>
           ذخیره داده‌ها
         </button>
+        
         <button
           onClick={() => setIsVisible(false)}
-          className="font-medium"
+          className="btn-modern btn-secondary font-medium"
           style={{
-            padding: '10px 16px',
-            border: '1px solid #ddd',
-            background: '#fff',
-            color: '#666',
-            borderRadius: '4px',
+            padding: '12px 20px',
+            borderRadius: '8px',
             cursor: 'pointer',
-            flex: 1
+            flex: 1,
+            minWidth: '120px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            transition: 'all 0.3s ease'
           }}
         >
+          <svg className="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
           لغو
         </button>
+      </div>
+      
+      <div className="help-text" style={{
+        marginTop: '16px',
+        padding: '12px',
+        background: 'var(--info-bg)',
+        borderRadius: '8px',
+        fontSize: '0.85rem',
+        color: 'var(--text-secondary)',
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: '8px'
+      }}>
+        <svg className="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M9,9h0a3,3,0,0,1,6,0c0,2-3,3-3,3"/>
+          <path d="M12,17h0"/>
+        </svg>
+        <div>
+          داده‌ها را از جدول اکسل کپی کرده و در ناحیه بالا پیست کنید. فرمت مورد انتظار شامل ستون‌های کد درس، نام درس، واحد، استاد و زمان‌بندی است.
+        </div>
       </div>
     </div>
   );

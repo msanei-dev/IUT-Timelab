@@ -42,8 +42,12 @@ ipcMain.handle('get-course-names', async () => {
   return data.courses.map(c => c.courseName);
 });
 
-ipcMain.handle('get-ranked-schedules', async (_event, desiredCourseNames: string[]) => {
-  return getRankedSchedules(desiredCourseNames);
+ipcMain.handle('get-data', async () => {
+  return loadData();
+});
+
+ipcMain.handle('get-ranked-schedules', async (_event, desiredCourseNames: string[], preferences?: any[]) => {
+  return getRankedSchedules(desiredCourseNames, preferences);
 });
 
 ipcMain.handle('save-data', async (_event, newData: any) => {

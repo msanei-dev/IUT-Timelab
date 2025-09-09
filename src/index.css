@@ -7,11 +7,269 @@
   font-display: swap;
 }
 
+/* CSS Variables for Professional Theme */
+:root {
+  --primary-gradient: linear-gradient(135deg, #2c5364 0%, #0f2027 100%);
+  --secondary-gradient: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+  --accent-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --glass-bg: rgba(255, 250, 250, 0.1);
+  --glass-border: rgba(255, 250, 250, 0.2);
+  --text-primary: #fffafa;
+  --text-secondary: rgba(255, 250, 250, 0.8);
+  --text-muted: rgba(255, 250, 250, 0.6);
+  --shadow-soft: 0 8px 32px rgba(0, 0, 0, 0.12);
+  --shadow-medium: 0 12px 40px rgba(0, 0, 0, 0.15);
+  --shadow-hard: 0 20px 60px rgba(0, 0, 0, 0.2);
+  --border-radius: 16px;
+  --border-radius-lg: 24px;
+  --transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
 body {
   font-family: 'Estedad', sans-serif;
   margin: 0;
-  background: #f8f9fa;
-  direction: rtl; /* برای پشتیبانی بهتر از فارسی */
+  background: var(--primary-gradient);
+  min-height: 100vh;
+  direction: rtl;
+  overflow-x: hidden;
+}
+
+/* Glass Morphism Effect */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-soft);
+}
+
+.glass-card {
+  background: rgba(255, 250, 250, 0.08);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border: 1px solid rgba(255, 250, 250, 0.15);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-medium);
+  transition: var(--transition);
+}
+
+.glass-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-hard);
+  background: rgba(255, 250, 250, 0.12);
+}
+
+/* Modern Button Styles */
+.btn-modern {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: var(--transition);
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-decoration: none;
+  user-select: none;
+}
+
+.btn-primary {
+  background: var(--accent-gradient);
+  color: var(--text-primary);
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+}
+
+.btn-secondary {
+  background: var(--secondary-gradient);
+  color: var(--text-primary);
+  box-shadow: 0 4px 15px rgba(30, 60, 114, 0.3);
+}
+
+.btn-secondary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(30, 60, 114, 0.4);
+}
+
+.btn-success {
+  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+  color: var(--text-primary);
+  box-shadow: 0 4px 15px rgba(17, 153, 142, 0.3);
+}
+
+.btn-success:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(17, 153, 142, 0.4);
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%);
+  color: var(--text-primary);
+  box-shadow: 0 4px 15px rgba(255, 65, 108, 0.3);
+}
+
+.btn-danger:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(255, 65, 108, 0.4);
+}
+
+.btn-glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
+}
+
+.btn-glass:hover {
+  background: rgba(255, 250, 250, 0.15);
+  transform: translateY(-2px);
+}
+
+/* Icon Styles */
+.icon {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+.icon-sm {
+  width: 16px;
+  height: 16px;
+}
+
+.icon-lg {
+  width: 24px;
+  height: 24px;
+}
+
+/* Animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(100px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+/* Text Styles */
+.text-gradient {
+  background: linear-gradient(135deg, var(--text-primary), var(--text-secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* اعمال فونت به همه المان‌ها */
+* {
+  font-family: 'Estedad', sans-serif !important;
+  direction: rtl;
+}
+
+/* فونت برای المان‌های خاص */
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Estedad', sans-serif !important;
+  color: var(--text-primary);
+}
+
+button, input, select, textarea {
+  font-family: 'Estedad', sans-serif !important;
+}
+
+table, th, td {
+  font-family: 'Estedad', sans-serif !important;
+}
+
+div, span, p, label {
+  font-family: 'Estedad', sans-serif !important;
+}
+
+/* Scrollbar styling for RTL */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 250, 250, 0.1);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--primary-gradient);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--secondary-gradient);
+}
+
+/* RTL scrollbar placement */
+.rtl-scroll {
+  direction: rtl;
+}
+
+.rtl-scroll * {
+  direction: ltr;
+}
+
+.calendar-container {
+  direction: ltr;
+  text-align: right;
 }
 
 /* کلاس‌های مختلف وزن فونت */
@@ -23,7 +281,239 @@ body {
 .font-bold { font-weight: 700; }
 .font-black { font-weight: 900; }
 
-button:disabled {
-  background: #aaa !important;
-  cursor: not-allowed !important;
+/* Form Controls */
+.form-control {
+  background: rgba(255, 250, 250, 0.08);
+  border: 1px solid rgba(255, 250, 250, 0.2);
+  border-radius: 12px;
+  padding: 12px 16px;
+  color: var(--text-primary);
+  transition: var(--transition);
 }
+
+.form-control:focus {
+  outline: none;
+  border-color: rgba(102, 126, 234, 0.6);
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  background: rgba(255, 250, 250, 0.12);
+}
+
+.form-control::placeholder {
+  color: var(--text-muted);
+}
+
+button:disabled {
+  background: rgba(255, 250, 250, 0.1) !important;
+  cursor: not-allowed !important;
+  opacity: 0.5 !important;
+}
+
+.btn-disabled {
+  background: rgba(255, 250, 250, 0.1) !important;
+  cursor: not-allowed !important;
+  opacity: 0.5 !important;
+  color: var(--text-muted) !important;
+}
+
+/* Additional Gradients for UI Elements */
+:root {
+  --warning-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  --info-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  --dark-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  
+  /* Background Colors */
+  --primary-bg-light: rgba(44, 83, 100, 0.1);
+  --secondary-bg: rgba(255, 250, 250, 0.05);
+  --success-bg: rgba(17, 153, 142, 0.1);
+  --warning-bg: rgba(240, 147, 251, 0.1);
+  --info-bg: rgba(79, 172, 254, 0.1);
+  --input-bg: rgba(255, 250, 250, 0.08);
+  
+  /* Border Colors */
+  --border-light: rgba(255, 250, 250, 0.1);
+  --border-medium: rgba(255, 250, 250, 0.2);
+  --border-strong: rgba(255, 250, 250, 0.3);
+}
+
+/* Modern Table Styles */
+.modern-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--glass-bg);
+  backdrop-filter: blur(10px);
+  border-radius: var(--border-radius);
+  overflow: hidden;
+  box-shadow: var(--shadow-light);
+}
+
+.modern-table th {
+  background: var(--primary-gradient);
+  color: var(--text-primary);
+  padding: 16px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.modern-table td {
+  padding: 12px 16px;
+  text-align: center;
+  border-bottom: 1px solid var(--border-light);
+  color: var(--text-primary);
+  transition: var(--transition);
+}
+
+.modern-table tr:hover td {
+  background: rgba(255, 250, 250, 0.05);
+}
+
+.modern-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* Navigation Styles */
+.nav-tab {
+  padding: 12px 20px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition);
+  border-radius: 12px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-tab.active {
+  background: var(--glass-bg);
+  color: var(--text-primary);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border);
+}
+
+.nav-tab:hover:not(.active) {
+  background: rgba(255, 250, 250, 0.05);
+  color: var(--text-primary);
+}
+
+/* Status Indicators */
+.status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-success {
+  background: var(--success-bg);
+  color: #10b981;
+}
+
+.status-warning {
+  background: var(--warning-bg);
+  color: #f59e0b;
+}
+
+.status-error {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.status-info {
+  background: var(--info-bg);
+  color: #3b82f6;
+}
+
+/* Modern Form Elements */
+.modern-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.modern-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.modern-textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.modern-checkbox {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--glass-border);
+  border-radius: 4px;
+  background: var(--glass-bg);
+  cursor: pointer;
+  position: relative;
+  transition: var(--transition);
+}
+
+.modern-checkbox:checked {
+  background: var(--primary-gradient);
+  border-color: transparent;
+}
+
+.modern-checkbox:checked::after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+/* Loading States */
+.loading {
+  position: relative;
+  overflow: hidden;
+}
+
+.loading::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.1),
+    transparent
+  );
+  animation: shimmer 2s infinite;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .glass-card {
+    padding: 16px;
+    margin: 8px 0;
+  }
+  
+  .btn-modern {
+    padding: 10px 16px;
+    font-size: 13px;
+  }
+  
+  .modern-table th,
+  .modern-table td {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+}
+

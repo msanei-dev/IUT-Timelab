@@ -85,7 +85,7 @@ export function calculateScore(schedule: ScheduleSection[]): number {
 }
 
 // Main API: get ranked schedules
-export function getRankedSchedules(desiredCourseNames: string[]): Schedule[] {
+export function getRankedSchedules(desiredCourseNames: string[], preferences?: any[]): Schedule[] {
   const data = loadData();
   const all = findSchedules(data.courses, desiredCourseNames);
   return all.map(sections => ({
