@@ -1,5 +1,6 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import { getRankedSchedules, loadData } from './solver';
+import { parseExcelToCourses, saveCoursesToJson } from './excelUtils';
 
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
 declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
@@ -59,35 +60,91 @@ ipcMain.handle('save-data', async (_event, newData: any) => {
     // مسیر فایل data.json
     const dataPath = path.join(__dirname, 'data.json');
     
-    // خواندن داده‌های موجود
-    let existingData: any = { courses: [] };
-    if (fs.existsSync(dataPath)) {
-      const rawData = fs.readFileSync(dataPath, 'utf-8');
-      existingData = JSON.parse(rawData);
+    // اگر داده‌های جدید خالی باشه، فایل رو پاک کن
+    if (!newData.courses || newData.courses.length === 0) {
+      const emptyData: { courses: any[] } = { courses: [] };
+      fs.writeFileSync(dataPath, JSON.stringify(emptyData, null, 2), 'utf-8');
+      return { success: true, message: 'Data cleared successfully' };
     }
     
-    // ادغام داده‌های جدید با موجود
-    const mergedCourses = [...existingData.courses];
-    for (const newCourse of newData.courses) {
-      const existingIndex = mergedCourses.findIndex(c => c.courseCode === newCourse.courseCode);
-      if (existingIndex >= 0) {
-        // به‌روزرسانی درس موجود
-        mergedCourses[existingIndex] = newCourse;
-      } else {
-        // اضافه کردن درس جدید
-        mergedCourses.push(newCourse);
-      }
-    }
-    
-    const finalData = { courses: mergedCourses };
-    
-    // ذخیره‌سازی در فایل
-    fs.writeFileSync(dataPath, JSON.stringify(finalData, null, 2), 'utf-8');
+    // جایگزین کامل داده‌ها (بدون ادغام)
+    fs.writeFileSync(dataPath, JSON.stringify(newData, null, 2), 'utf-8');
     
     return { success: true, message: 'Data saved successfully' };
   } catch (error) {
     console.error('Error saving data:', error);
     return { success: false, message: error.message };
+  }
+});
+
+// API جدید برای خواندن فایل اکسل
+ipcMain.handle('import-excel', async (_event) => {
+  try {
+    // نمایش دیالوگ انتخاب فایل
+    const result = await dialog.showOpenDialog({
+      title: 'انتخاب فایل اکسل',
+      filters: [
+        { name: 'Excel Files', extensions: ['xlsx', 'xls'] },
+        { name: 'All Files', extensions: ['*'] }
+      ],
+      properties: ['openFile']
+    });
+
+    if (result.canceled) {
+      return { success: false, message: 'User canceled file selection' };
+    }
+
+    const filePath = result.filePaths[0];
+    
+    // خواندن فایل به صورت Buffer
+    const fs = require('fs');
+    const fileBuffer = fs.readFileSync(filePath);
+    
+    return { 
+      success: true, 
+      message: 'فایل با موفقیت انتخاب شد',
+      fileBuffer: Array.from(fileBuffer), // تبدیل Buffer به Array برای انتقال
+      fileName: require('path').basename(filePath)
+    };
+    
+  } catch (error) {
+    console.error('Error selecting Excel file:', error);
+    return { 
+      success: false, 
+      message: `خطا در انتخاب فایل اکسل: ${error.message}` 
+    };
+  }
+});
+
+// API جدید برای پردازش داده‌های اکسل
+ipcMain.handle('process-excel-data', async (_event, fileBuffer: number[]) => {
+  try {
+    // تبدیل Array به Buffer
+    const buffer = Buffer.from(fileBuffer);
+    
+    // خواندن و تجزیه فایل اکسل
+    const courses = parseExcelToCourses(buffer);
+    
+    // ذخیره در فایل data.json
+    const fs = require('fs');
+    const path = require('path');
+    const dataPath = path.join(__dirname, 'data.json');
+    const dataToSave = { courses: courses };
+    
+    fs.writeFileSync(dataPath, JSON.stringify(dataToSave, null, 2), 'utf-8');
+    
+    return { 
+      success: true, 
+      message: `${courses.length} درس با موفقیت از فایل اکسل خوانده شد`,
+      data: dataToSave
+    };
+    
+  } catch (error) {
+    console.error('Error processing Excel data:', error);
+    return { 
+      success: false, 
+      message: `خطا در پردازش فایل اکسل: ${error.message}` 
+    };
   }
 });
 

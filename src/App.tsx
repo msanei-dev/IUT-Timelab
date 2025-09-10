@@ -5,6 +5,7 @@ import CalendarView from './CalendarView';
 import PlanNavigator from './PlanNavigator';
 import DataInput from './DataInput';
 import PreferencePanel from './PreferencePanel';
+import CourseDetails from './CourseDetails';
 
 const api = (window as any).api;
 
@@ -16,36 +17,125 @@ const App: React.FC = () => {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [loading, setLoading] = useState(false);
   const [preferences, setPreferences] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'courses' | 'preferences'>('courses');
+  const [activeTab, setActiveTab] = useState<'courses' | 'preferences' | 'details'>('courses');
+  
+  // Map between display names and actual course names
+  const [courseNameMapping, setCourseNameMapping] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
-    api.getCourseNames().then(setCourseNames);
-    api.getData().then(setCourses);
+    // دریافت داده‌های کامل و ترکیب کد + نام
+    api.getData().then((coursesData: any) => {
+      setCourses(coursesData);
+      if (coursesData && coursesData.courses) {
+        const mapping = new Map<string, string>();
+        const displayNames: string[] = [];
+        
+        // Generate separate entries for each section
+        coursesData.courses.forEach((c: any) => {
+          if (c.sections && c.sections.length > 0) {
+            c.sections.forEach((section: any) => {
+              const displayName = `${c.courseCode}_${section.sectionCode} - ${c.courseName}`;
+              mapping.set(displayName, c.courseName); // Map display name to actual name
+              displayNames.push(displayName);
+            });
+          } else {
+            // Fallback for courses without sections
+            const displayName = `${c.courseCode} - ${c.courseName}`;
+            mapping.set(displayName, c.courseName);
+            displayNames.push(displayName);
+          }
+        });
+        
+        setCourseNames(displayNames);
+        setCourseNameMapping(mapping);
+      }
+    });
   }, []);
 
   const generateSchedules = async () => {
     setLoading(true);
+    
+    // Convert display names back to actual course names for API
+    const actualCourseNames = selected.map(displayName => 
+      courseNameMapping.get(displayName) || displayName
+    );
+    
+    console.log('Selected display names:', selected);
+    console.log('Actual course names for API:', actualCourseNames);
+    
     // Pass preferences to the scheduling algorithm
-    const result = await api.getRankedSchedules(selected, preferences);
-    setSchedules(result);
-    setCurrentIdx(0);
+    const result = await api.getRankedSchedules(actualCourseNames, preferences);
+    
+    console.log('Schedule generation result:', result);
+    
+    if (result.schedules && result.schedules.length > 0) {
+      setSchedules(result.schedules);
+      setCurrentIdx(0);
+    } else if (result.conflicts) {
+      // نمایش تداخل‌ها و پیشنهادات
+      let message = `متأسفانه نمی‌توان برنامه کلاسی بدون تداخل برای دروس انتخابی ایجاد کرد.\n\n`;
+      
+      if (result.conflicts.conflicts.length > 0) {
+        message += `تداخل‌های موجود:\n`;
+        result.conflicts.conflicts.forEach((conflict: any, idx: number) => {
+          message += `${idx + 1}. ${conflict.message}\n`;
+        });
+      }
+      
+      if (result.conflicts.suggestions.length > 0) {
+        message += `\nپیشنهادات:\n`;
+        result.conflicts.suggestions.slice(0, 3).forEach((suggestion: any, idx: number) => {
+          const formatSchedule = (schedule: any[]) => {
+            const dayNames: { [key: string]: string } = {
+              'Saturday': 'شنبه',
+              'Sunday': 'یکشنبه',
+              'Monday': 'دوشنبه',
+              'Tuesday': 'سه‌شنبه',
+              'Wednesday': 'چهارشنبه',
+              'Thursday': 'پنج‌شنبه',
+              'Friday': 'جمعه'
+            };
+            return schedule.map(s => `${dayNames[s.day]} ${s.start}-${s.end}`).join(', ');
+          };
+          
+          message += `${idx + 1}. ${suggestion.course1} (گروه ${suggestion.section1}) + ${suggestion.course2} (گروه ${suggestion.section2})\n`;
+        });
+      }
+      
+      if (result.conflicts.coursesWithMultipleSections.length > 0) {
+        message += `\nدروس با section های متعدد:\n`;
+        result.conflicts.coursesWithMultipleSections.forEach((course: any) => {
+          message += `- ${course.courseName}: ${course.sectionsCount} گروه\n`;
+        });
+        message += `\nلطفاً تب "جزئیات دروس" را بررسی کنید تا زمان‌بندی تمام گروه‌ها را ببینید.`;
+      }
+      
+      alert(message);
+      setSchedules([]);
+    } else {
+      alert('خطا در تولید برنامه کلاسی');
+      setSchedules([]);
+    }
+    
     setLoading(false);
   };
 
   const clearAllData = async () => {
     if (confirm('آیا مطمئن هستید که می‌خواهید همه داده‌ها را حذف کنید؟\nاین عمل قابل بازگشت نیست.')) {
       try {
-        // Clear data on server
+        // Clear data on server - فرستادن آرایه خالی
         await api.saveData({ courses: [] });
         
         // Reset local state
         setCourseNames([]);
-        setCourses(null);
+        setCourses({ courses: [] });
         setSelected([]);
         setSchedules([]);
         setPreferences([]);
         setCurrentIdx(0);
+        setCourseNameMapping(new Map());
         
+        console.log('All data cleared successfully'); // Debug log
         alert('همه داده‌ها با موفقیت حذف شدند!');
       } catch (error) {
         console.error('Error clearing data:', error);
@@ -54,26 +144,154 @@ const App: React.FC = () => {
     }
   };
 
+  const importFromExcel = async () => {
+    try {
+      setLoading(true);
+      
+      // انتخاب فایل
+      const fileResult = await api.importExcel();
+      
+      if (!fileResult.success) {
+        alert(fileResult.message);
+        return;
+      }
+      
+      // پردازش فایل
+      const processResult = await api.processExcelData(fileResult.fileBuffer);
+      
+      if (processResult.success) {
+        // به‌روزرسانی state با داده‌های جدید
+        setCourses(processResult.data);
+        
+        // ترکیب courseCode و courseName برای نمایش و فیلتر
+        const mapping = new Map<string, string>();
+        const displayNames: string[] = [];
+        
+        // Generate separate entries for each section
+        processResult.data.courses.forEach((c: any) => {
+          if (c.sections && c.sections.length > 0) {
+            c.sections.forEach((section: any) => {
+              const displayName = `${c.courseCode}_${section.sectionCode} - ${c.courseName}`;
+              mapping.set(displayName, c.courseName);
+              displayNames.push(displayName);
+            });
+          } else {
+            // Fallback for courses without sections
+            const displayName = `${c.courseCode} - ${c.courseName}`;
+            mapping.set(displayName, c.courseName);
+            displayNames.push(displayName);
+          }
+        });
+        
+        setCourseNames(displayNames);
+        setCourseNameMapping(mapping);
+        
+        setSelected([]);
+        setSchedules([]);
+        setCurrentIdx(0);
+        
+        alert(processResult.message);
+      } else {
+        alert(processResult.message);
+      }
+    } catch (error) {
+      console.error('Error importing Excel:', error);
+      alert('خطا در خواندن فایل اکسل');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleDataSubmit = async (rawData: string) => {
     try {
+      console.log('Raw data received:', rawData); // Debug log
+      
       // پارس کردن داده‌های خام به فرمت JSON
-      const parsedData = parseTableData(rawData);
+      const newParsedData = parseTableData(rawData);
       
-      // ارسال داده‌ها به main process برای ذخیره‌سازی
-      await api.saveData(parsedData);
+      console.log('New parsed data:', newParsedData); // Debug log
       
-      // به‌روزرسانی لیست درس‌ها
-      const updatedCourses = await api.getCourseNames();
-      setCourseNames(updatedCourses);
+      if (!newParsedData.courses || newParsedData.courses.length === 0) {
+        alert('هیچ درسی شناسایی نشد! لطفاً فرمت داده‌ها را بررسی کنید.');
+        return;
+      }
+      
+      // دریافت داده‌های موجود
+      const existingData = await api.getData();
+      console.log('Existing data:', existingData); // Debug log
+      
+      // ادغام داده‌های جدید با موجود
+      const mergedCourses = [...(existingData.courses || [])];
+      
+      for (const newCourse of newParsedData.courses) {
+        const existingIndex = mergedCourses.findIndex(c => c.courseCode === newCourse.courseCode);
+        if (existingIndex >= 0) {
+          // اگر درس موجود بود، section های جدید رو اضافه کن
+          const existingCourse = mergedCourses[existingIndex];
+          for (const newSection of newCourse.sections) {
+            const sectionExists = existingCourse.sections.some((s: any) => s.sectionCode === newSection.sectionCode);
+            if (!sectionExists) {
+              existingCourse.sections.push(newSection);
+            }
+          }
+        } else {
+          // اگر درس جدید بود، کل درس رو اضافه کن
+          mergedCourses.push(newCourse);
+        }
+      }
+      
+      const finalData = { courses: mergedCourses };
+      console.log('Final merged data:', finalData); // Debug log
+      
+      // ذخیره‌سازی داده‌های ادغام شده
+      await api.saveData(finalData);
       
       // به‌روزرسانی داده‌های کامل درس‌ها
       const fullCourseData = await api.getData();
       setCourses(fullCourseData);
       
-      alert('داده‌ها با موفقیت ذخیره شدند!');
+      // به‌روزرسانی لیست درس‌ها با ترکیب کد و نام
+      const mapping = new Map<string, string>();
+      const displayNames: string[] = [];
+      
+      // Generate separate entries for each section
+      fullCourseData.courses.forEach((c: any) => {
+        if (c.sections && c.sections.length > 0) {
+          c.sections.forEach((section: any) => {
+            const displayName = `${c.courseCode}_${section.sectionCode} - ${c.courseName}`;
+            mapping.set(displayName, c.courseName);
+            displayNames.push(displayName);
+          });
+        } else {
+          // Fallback for courses without sections
+          const displayName = `${c.courseCode} - ${c.courseName}`;
+          mapping.set(displayName, c.courseName);
+          displayNames.push(displayName);
+        }
+      });
+      
+      setCourseNames(displayNames);
+      setCourseNameMapping(mapping);
+      
+      console.log('Updated course data:', fullCourseData); // Debug log
+      
+      alert(`داده‌ها با موفقیت ذخیره شدند! ${newParsedData.courses.length} درس جدید اضافه شد. مجموع: ${finalData.courses.length} درس`);
     } catch (error) {
       console.error('Error saving data:', error);
-      alert('خطا در ذخیره‌سازی داده‌ها');
+      alert('خطا در ذخیره‌سازی داده‌ها: ' + error.message);
+    }
+  };
+
+  const handleFileUpload = async (file: File) => {
+    try {
+      const text = await file.text();
+      console.log('File content:', text); // Debug log
+      
+      // Process the file content same as manual input
+      await handleDataSubmit(text);
+    } catch (error) {
+      console.error('Error reading file:', error);
+      alert('خطا در خواندن فایل: ' + error.message);
     }
   };
 
@@ -97,10 +315,14 @@ const App: React.FC = () => {
       if (line.includes('\t') && line.match(/^\d+_\d+\t/)) {
         // پارس کردن خط section جدید
         const parts = line.split('\t');
+        console.log('Parsed parts:', parts); // Debug log
+        
         const fullCourseCode = parts[0].trim(); // مثل: ۵۰۱۶۰۲۴_۰۳
         const courseName = parts[1].trim();
         const units = parseInt(parts[2]) || 3;
         const professor = parts[8]?.trim() || 'نامشخص';
+
+        console.log(`Course: ${fullCourseCode}, Name: ${courseName}, Professor: ${professor}`); // Debug log
 
         // استخراج کد اصلی درس (بدون section)
         const baseCourseCode = fullCourseCode.split('_')[0]; // مثل: ۵۰۱۶۰۲۴
@@ -132,7 +354,10 @@ const App: React.FC = () => {
         currentCourse = { courseCode: baseCourseCode, sectionIndex: coursesMap.get(baseCourseCode).sections.length - 1 };
         
         console.log('Created new section:', newSection, 'for course:', baseCourseCode); // Debug log
-      } else if (currentCourse && (line.includes('درس(ت):') || line.includes('درس(ع):'))) {
+      } else if (currentCourse && (line.includes('درس(ت):') || line.includes('درس(ع):') || 
+                 (line.includes('شنبه') || line.includes('دوشنبه') || line.includes('سه شنبه') || 
+                  line.includes('چهارشنبه') || line.includes('پنج شنبه') || line.includes('جمعه') || 
+                  line.includes('یک شنبه') || line.includes('يك شنبه')))) {
         // پردازش خطوط زمان‌بندی
         console.log('Processing schedule line:', line); // Debug log
         const timeSlots = extractTimeSlots(line);
@@ -153,6 +378,8 @@ const App: React.FC = () => {
   };
 
   const extractTimeSlots = (scheduleText: string) => {
+    console.log('Extracting time slots from:', scheduleText); // Debug log
+    
     const timeSlots = [];
     const dayMap: Record<string, string> = {
       'شنبه': 'Saturday',
@@ -170,7 +397,7 @@ const App: React.FC = () => {
 
     // الگوی بهبود یافته برای پارس کردن زمان‌بندی
     // پشتیبانی از فرمت فارسی: "درس(ت):" یا "درس(ع):" + "روز ۱۱:۰۰-۱۲:۳۰"
-    const timePattern = /(درس\([تع]\):\s*)(شنبه|يك شنبه|یک شنبه|دوشنبه|سه شنبه|سه‌شنبه|چهارشنبه|چهار شنبه|پنج شنبه|پنج‌شنبه|جمعه)\s+([۰-۹\d]{1,2}:[۰-۹\d]{2})-([۰-۹\d]{1,2}:[۰-۹\d]{2})/g;
+    const timePattern = /(شنبه|يك شنبه|یک شنبه|دوشنبه|سه شنبه|سه‌شنبه|چهارشنبه|چهار شنبه|پنج شنبه|پنج‌شنبه|جمعه)\s+([۰-۹\d]{1,2}:[۰-۹\d]{2})-([۰-۹\d]{1,2}:[۰-۹\d]{2})/g;
     
     // تابع تبدیل اعداد فارسی به انگلیسی
     const persianToEnglish = (str: string) => {
@@ -179,9 +406,13 @@ const App: React.FC = () => {
     
     let match;
     while ((match = timePattern.exec(scheduleText)) !== null) {
-      const dayPersian = match[2];  // تغییر index به خاطر گروه جدید
-      let startTime = match[3];
-      let endTime = match[4];
+      console.log('RegEx match found:', match); // Debug log
+      
+      const dayPersian = match[1];  // تغییر index
+      let startTime = match[2];     // تغییر index  
+      let endTime = match[3];       // تغییر index
+      
+      console.log(`Day: ${dayPersian}, Start: ${startTime}, End: ${endTime}`); // Debug log
       
       // تبدیل اعداد فارسی به انگلیسی
       startTime = persianToEnglish(startTime);
@@ -189,13 +420,17 @@ const App: React.FC = () => {
       
       const day = dayMap[dayPersian];
       if (day) {
-        timeSlots.push({
+        const timeSlot = {
           day: day as any,
           start: startTime,
           end: endTime
-        });
+        };
+        console.log('Adding time slot:', timeSlot); // Debug log
+        timeSlots.push(timeSlot);
       }
     }
+    
+    console.log('Final time slots:', timeSlots); // Debug log
 
     return timeSlots;
   };
@@ -206,47 +441,32 @@ const App: React.FC = () => {
       display: 'flex',
       flexDirection: 'row',
       fontFamily: 'Estedad, sans-serif',
-      background: 'var(--primary-gradient)',
-      padding: '24px',
-      gap: '24px',
+      background: 'var(--bg-primary)',
+      padding: '16px',
+      gap: '16px',
       boxSizing: 'border-box'
     }}>
       {/* Sidebar */}
-      <div className="glass" style={{
-        width: 450,
-        padding: '32px 28px',
+      <div className="card" style={{
+        width: 380,
+        padding: '20px 16px',
         boxSizing: 'border-box',
         overflowY: 'auto',
         animation: 'slideInLeft 0.6s ease-out'
       }}>
         {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <div style={{
-            width: '64px',
-            height: '64px',
-            margin: '0 auto 16px',
-            background: 'var(--accent-gradient)',
-            borderRadius: '20px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: 'var(--shadow-medium)'
-          }}>
-            <svg className="icon-lg" viewBox="0 0 24 24" fill="none" stroke="var(--text-primary)" strokeWidth="2">
-              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-            </svg>
-          </div>
+        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
           <h1 style={{
-            fontSize: '1.8rem',
-            fontWeight: '800',
-            margin: '0 0 8px 0',
+            fontSize: '1.5rem',
+            fontWeight: '700',
+            margin: '0 0 6px 0',
             color: 'var(--text-primary)'
           }}>
             برنامه‌ساز هوشمند
           </h1>
           <p style={{
             color: 'var(--text-secondary)',
-            fontSize: '0.95rem',
+            fontSize: '0.85rem',
             margin: 0,
             fontWeight: '400'
           }}>
@@ -255,19 +475,19 @@ const App: React.FC = () => {
         </div>
 
         {/* Tab Navigation */}
-        <div className="glass-card" style={{
+        <div className="card" style={{
           display: 'flex',
-          marginBottom: '28px',
-          padding: '6px',
-          gap: '4px'
+          marginBottom: '18px',
+          padding: '4px',
+          gap: '2px'
         }}>
           <button
             onClick={() => setActiveTab('courses')}
-            className={`btn-modern ${activeTab === 'courses' ? 'btn-primary' : 'btn-glass'}`}
+            className={`nav-tab ${activeTab === 'courses' ? 'active' : ''}`}
             style={{
               flex: 1,
-              padding: '12px 16px',
-              fontSize: '14px',
+              padding: '8px 10px',
+              fontSize: '12px',
               fontWeight: '600'
             }}
           >
@@ -279,11 +499,11 @@ const App: React.FC = () => {
           </button>
           <button
             onClick={() => setActiveTab('preferences')}
-            className={`btn-modern ${activeTab === 'preferences' ? 'btn-primary' : 'btn-glass'}`}
+            className={`nav-tab ${activeTab === 'preferences' ? 'active' : ''}`}
             style={{
               flex: 1,
-              padding: '12px 16px',
-              fontSize: '14px',
+              padding: '8px 10px',
+              fontSize: '12px',
               fontWeight: '600'
             }}
           >
@@ -291,16 +511,38 @@ const App: React.FC = () => {
               <circle cx="12" cy="12" r="3" />
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1 1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
             </svg>
-            تنظیمات ترجیحات
+            ترجیحات
+          </button>
+          <button
+            onClick={() => setActiveTab('details')}
+            className={`nav-tab ${activeTab === 'details' ? 'active' : ''}`}
+            style={{
+              flex: 1,
+              padding: '8px 10px',
+              fontSize: '12px',
+              fontWeight: '600'
+            }}
+          >
+            <svg className="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14,2 14,8 20,8" />
+              <line x1="16" y1="13" x2="8" y2="13" />
+              <line x1="16" y1="17" x2="8" y2="17" />
+              <polyline points="10,9 9,9 8,9" />
+            </svg>
+            جزئیات
           </button>
         </div>
 
         {activeTab === 'courses' ? (
-          <div className="glass-card" style={{ padding: '24px' }}>
-            <DataInput onDataSubmit={handleDataSubmit} />
+          <div className="card" style={{ padding: '16px' }}>
+            <DataInput 
+              onDataSubmit={handleDataSubmit} 
+              onFileUpload={handleFileUpload}
+            />
             
             {courseNames.length > 0 && (
-              <div style={{ marginTop: '24px' }}>
+              <div style={{ marginTop: '16px' }}>
                 <CourseSelector
                   courseNames={courseNames}
                   selected={selected}
@@ -312,17 +554,18 @@ const App: React.FC = () => {
             {/* Action Buttons */}
             <div style={{
               display: 'flex',
-              gap: '12px',
-              marginTop: '24px'
+              gap: '8px',
+              marginTop: '16px'
             }}>
               <button 
                 onClick={generateSchedules} 
                 disabled={selected.length === 0 || loading} 
-                className="btn-modern btn-success"
+                className="btn btn-primary"
                 style={{
                   flex: 2,
-                  fontSize: '14px',
-                  fontWeight: '600'
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  padding: '8px 12px'
                 }}
               >
                 <svg className="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -332,44 +575,70 @@ const App: React.FC = () => {
                   <line x1="16" y1="17" x2="8" y2="17" />
                   <polyline points="10,9 9,9 8,9" />
                 </svg>
-                {loading ? 'در حال تولید...' : 'تولید برنامه کلاسی'}
+                {loading ? 'تولید...' : 'تولید برنامه'}
               </button>
               
               <button 
                 onClick={clearAllData}
                 disabled={loading}
-                className="btn-modern btn-danger"
+                className="btn btn-danger"
                 style={{
-                  fontSize: '14px',
+                  fontSize: '12px',
                   fontWeight: '600',
-                  minWidth: '50px'
+                  padding: '8px 12px'
                 }}
                 title="حذف همه داده‌ها"
               >
                 <svg className="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <polyline points="3,6 5,6 21,6" />
-                  <path d="M19,6v14a2,2,0,0,1-2,2H7a2,2,0,0,1-2-2V6m3,0V4a2,2,0,0,1,2-2h4a2,2,0,0,1,2,2V6" />
+                  <path d="M19,6v14a2,2,0,0,1-2,2H7a2,2,0,0,1-2-2V6m3,0V4a2,2,0,0,1,2,2h4a2,2,0,0,1,2,2V6" />
                   <line x1="10" y1="11" x2="10" y2="17" />
                   <line x1="14" y1="11" x2="14" y2="17" />
                 </svg>
+                حذف
+              </button>
+              
+              <button 
+                onClick={importFromExcel}
+                disabled={loading}
+                className="btn btn-secondary"
+                style={{
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  padding: '8px 12px'
+                }}
+                title="خواندن دروس از فایل اکسل"
+              >
+                <svg className="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14,2 14,8 20,8" />
+                  <path d="M9 15h6M9 12h6M9 9h6" />
+                </svg>
+                اکسل
               </button>
             </div>
           </div>
-        ) : (
-          <div className="glass-card" style={{ padding: '24px' }}>
+        ) : activeTab === 'preferences' ? (
+          <div className="card" style={{ padding: '16px' }}>
             <PreferencePanel
               courses={courses?.courses || []}
-              selectedCourses={selected}
+              selectedCourses={selected.map(displayName => 
+                courseNameMapping.get(displayName) || displayName
+              )}
               onPreferencesChange={setPreferences}
             />
+          </div>
+        ) : (
+          <div className="card" style={{ padding: '16px' }}>
+            <CourseDetails courses={courses} />
           </div>
         )}
       </div>
       
       {/* Main Content */}
-      <div className="glass" style={{
+      <div className="card" style={{
         flex: 1,
-        padding: '32px',
+        padding: '20px',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'stretch',

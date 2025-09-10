@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 
 interface Props {
   onDataSubmit: (data: string) => void;
+  onFileUpload: (file: File) => void;
 }
 
-const DataInput: React.FC<Props> = ({ onDataSubmit }) => {
+const DataInput: React.FC<Props> = ({ onDataSubmit, onFileUpload }) => {
   const [inputData, setInputData] = useState('');
   const [isVisible, setIsVisible] = useState(false);
 
@@ -14,6 +15,44 @@ const DataInput: React.FC<Props> = ({ onDataSubmit }) => {
       setInputData('');
       setIsVisible(false);
     }
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+        // Excel file
+        handleExcelFile(file);
+      } else {
+        // Text file
+        onFileUpload(file);
+      }
+    }
+    // Reset input
+    event.target.value = '';
+  };
+
+  const handleExcelFile = async (file: File) => {
+    try {
+      alert('فایل اکسل انتخاب شد! لطفاً ابتدا آن را به فرمت CSV تبدیل کنید.\n\nمراحل:\n1. فایل اکسل را در Excel باز کنید\n2. File > Save As > CSV (Comma delimited) انتخاب کنید\n3. فایل CSV ذخیره شده را آپلود کنید');
+    } catch (error) {
+      alert('خطا در پردازش فایل اکسل: ' + error.message);
+    }
+  };
+
+  const downloadTemplate = () => {
+    const template = `کد درس_بخش\tنام درس\tواحد\tظرفیت\tتعداد ثبت‌نام\tلیست انتظار\tنوع\tاستاد
+1914107_01\tریاضی عمومی 2\t3\t0\t165\t0\t0\tمختلط\tآقای نمونه
+درس(ت): شنبه 10:00-12:00 مکان: تالار7
+درس(ت): دوشنبه 10:00-12:00 مکان: تالار7`;
+    
+    const blob = new Blob([template], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'template-courses.txt';
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const parseTableData = (data: string) => {
@@ -107,7 +146,7 @@ const DataInput: React.FC<Props> = ({ onDataSubmit }) => {
         <svg className="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M12 5v14M5 12h14"/>
         </svg>
-        افزودن داده‌های جدید
+  افزودن گروه جدید
       </button>
     );
   }
