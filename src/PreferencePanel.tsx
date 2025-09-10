@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { CourseGroup } from './shared/types';
+import { CourseGroup, PreferenceWeights } from './shared/types';
 
 interface Professor {
   name: string;
@@ -46,12 +46,18 @@ interface PreferencePanelProps {
   courses: Course[];
   courseGroups: CourseGroup[];
   onPreferencesChange: (preferences: CoursePreference[]) => void;
+  weights: PreferenceWeights;
+  onWeightsChange: (w: PreferenceWeights) => void;
+  onGroupOrderChange?: (orderedIds: string[]) => void; // new: notify parent of reordered group IDs
 }
 
 const PreferencePanel: React.FC<PreferencePanelProps> = ({ 
   courses, 
   courseGroups,
-  onPreferencesChange
+  onPreferencesChange,
+  weights,
+  onWeightsChange,
+  onGroupOrderChange
 }) => {
   const [groupPrefs, setGroupPrefs] = useState<GroupPreference[]>([]);
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
@@ -149,8 +155,9 @@ const PreferencePanel: React.FC<PreferencePanelProps> = ({
     arr.splice(draggedIndex,1);
     arr.splice(dropIndex,0,draggedItem);
     // Reassign priority (index+1)
-    const reassigned = arr.map((g,i)=> ({ ...g, priority: i+1 }));
-    setGroupPrefs(reassigned);
+  const reassigned = arr.map((g,i)=> ({ ...g, priority: i+1 }));
+  setGroupPrefs(reassigned);
+  if (onGroupOrderChange) onGroupOrderChange(reassigned.map(g=>g.groupId));
     setDraggedIndex(null);
   };
   const updateProfessorRating = (groupId: string, professorName: string, rating: number) => {
@@ -324,7 +331,7 @@ const PreferencePanel: React.FC<PreferencePanelProps> = ({
         </h2>
       </div>
 
-      <div className="help-text" style={{
+  <div className="help-text" style={{
         marginBottom: '16px',
         padding: '14px 16px',
         background: 'rgba(255,255,255,0.04)',
@@ -347,6 +354,40 @@ const PreferencePanel: React.FC<PreferencePanelProps> = ({
           <br />
           ⭐ امتیاز 5: عالی | امتیاز 1: ضعیف
         </div>
+      </div>
+
+      {/* Weights Section */}
+      <div style={{
+        display:'grid',
+        gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',
+        gap:'16px',
+        marginBottom:'24px',
+        background:'rgba(255,255,255,0.04)',
+        padding:'16px 18px 10px',
+        border:'1px solid rgba(255,255,255,0.06)',
+        borderRadius:'12px'
+      }}>
+        {([
+          { key:'professor', label:'اهمیت استاد' },
+          { key:'timeSlot', label:'اهمیت زمان' },
+          { key:'freeDay', label:'روز خالی' },
+          { key:'compactness', label:'فشردگی برنامه' }
+        ] as {key:keyof PreferenceWeights; label:string;}[]).map(item => (
+          <div key={item.key} style={{ display:'flex', flexDirection:'column', gap:6 }}>
+            <label style={{ fontSize:'0.7rem', fontWeight:600, color:'var(--text-secondary)', display:'flex', justifyContent:'space-between' }}>
+              <span>{item.label}</span>
+              <span style={{ fontSize:'0.65rem', color:'var(--text-primary)' }}>{weights[item.key]}</span>
+            </label>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={weights[item.key]}
+              onChange={e => onWeightsChange({ ...weights, [item.key]: Number(e.target.value) })}
+              style={{ width:'100%' }}
+            />
+          </div>
+        ))}
       </div>
 
       <div className="preferences-list">

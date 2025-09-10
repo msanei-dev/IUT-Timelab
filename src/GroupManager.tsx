@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { CourseGroup, GroupingConfig } from './grouping';
+import { CourseGroup as LegacyCourseGroup, GroupingConfig } from './grouping';
+import { CourseGroup } from './shared/types';
 
 interface Props {
   allCourseNames: string[];
@@ -9,7 +10,8 @@ interface Props {
 
 // UI ساده مدیریت گروه‌ها: ایجاد، حذف، افزودن/حذف درس داخل هر گروه
 const GroupManager: React.FC<Props> = ({ allCourseNames, value, onChange }) => {
-  const [groups, setGroups] = useState<CourseGroup[]>(value.groups);
+  // local groups kept in legacy shape; we enhance with enabled flag when persisting via shared/types CourseGroup
+  const [groups, setGroups] = useState<LegacyCourseGroup[]>(value.groups);
   const [newGroupName, setNewGroupName] = useState('');
   const [filter, setFilter] = useState('');
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
@@ -18,7 +20,7 @@ const GroupManager: React.FC<Props> = ({ allCourseNames, value, onChange }) => {
 
   useEffect(() => { setGroups(value.groups); }, [value]);
 
-  const persist = (next: CourseGroup[]) => {
+  const persist = (next: LegacyCourseGroup[]) => {
     setGroups(next);
     onChange({ groups: next });
     localStorage.setItem('courseGroups', JSON.stringify(next));
@@ -75,8 +77,21 @@ const GroupManager: React.FC<Props> = ({ allCourseNames, value, onChange }) => {
     );
   };
 
+  const containerStyle: React.CSSProperties & { [key:string]: any } = {
+    padding: '16px',
+    borderRadius: '12px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+    maxHeight: 'calc(100vh - 220px)',
+    overflow: 'hidden',
+    boxSizing: 'border-box'
+  };
+  // جلوگیری از drag برای اجازه تایپ داخل input ها
+  (containerStyle as any).WebkitAppRegion = 'no-drag';
+
   return (
-    <div className="card" style={{ padding: '16px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: 'calc(100vh - 220px)', overflow: 'hidden', boxSizing: 'border-box' }}>
+    <div className="card" style={containerStyle}>
       <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>مدیریت گروه‌ها</h3>
       <div style={{ display: 'flex', gap: '8px' }}>
         <input value={newGroupName} onChange={e => setNewGroupName(e.target.value)} placeholder="نام گروه جدید" className="form-control" style={{ flex: 1, fontSize: '0.85rem' }} />
@@ -103,11 +118,17 @@ const GroupManager: React.FC<Props> = ({ allCourseNames, value, onChange }) => {
                 }}
                 onClick={() => setSelectedGroupId(g.id)}
               >
-                <div style={{ fontSize:'0.82rem', fontWeight:600, display:'flex', flexDirection:'column' }}>
+                <div style={{ fontSize:'0.82rem', fontWeight:600, display:'flex', flexDirection:'column', flex:1 }}>
                   <span style={{ lineHeight:1.2 }}>{g.name}</span>
                   <span style={{ color:'var(--text-secondary)', fontWeight:400, fontSize:'0.65rem' }}>{g.courseNames.length} درس</span>
                 </div>
                 <div style={{ display:'flex', gap:4 }}>
+                  <button
+                    onClick={e => { e.stopPropagation(); persist(groups.map(gr => gr.id===g.id ? { ...gr, // @ts-ignore legacy shape accept
+                      isActive: (gr as any).isActive === false ? true : !(gr as any).isActive } : gr)); }}
+                    style={{ background:'none', border:'none', cursor:'pointer', fontSize:'0.65rem', color:(g as any).isActive===false ? '#dc2626' : 'var(--primary-color)' }}
+                    title={(g as any).isActive===false ? 'فعال سازی گروه' : 'غیرفعال کردن گروه'}
+                  >{(g as any).isActive===false ? 'Off' : 'On'}</button>
                   <button
                     onClick={e => { e.stopPropagation(); removeGroup(g.id); }}
                     style={{ background:'none', border:'none', cursor:'pointer', color:'#dc2626', fontSize:'0.9rem', lineHeight:1 }}

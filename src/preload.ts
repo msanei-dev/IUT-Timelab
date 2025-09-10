@@ -9,6 +9,9 @@ contextBridge.exposeInMainWorld('api', {
   saveData: (data: any) => ipcRenderer.invoke('save-data', data),
   importExcel: () => ipcRenderer.invoke('import-excel'),
   processExcelData: (fileBuffer: number[]) => ipcRenderer.invoke('process-excel-data', fileBuffer),
+  // Settings persistence
+  saveSettings: (settings: any) => ipcRenderer.invoke('save-settings', settings),
+  loadSettings: () => ipcRenderer.invoke('load-settings'),
   windowControls: {
     minimize: () => ipcRenderer.send('win:minimize'),
     toggleMaximize: () => ipcRenderer.send('win:toggle-max'),

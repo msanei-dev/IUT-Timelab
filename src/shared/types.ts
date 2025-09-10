@@ -54,6 +54,28 @@ export interface CourseGroup {
   name: string;            // user-defined label (e.g., 'ریاضیات')
   priority: CourseGroupPriority; // relative importance in selection/scoring
   courseCodes: string[];   // list of courseCode values belonging to this group
+  isActive: boolean;       // whether this group participates in solving
+}
+
+// ----- Persistent User Settings -----
+export interface UserPreferences {
+  preferredProfessors: string[]; // global list of professor names user prefers
+  timeSlotScores: Record<string, number>; // key: Day-Start-End -> score (e.g., Saturday-08:00-10:00)
+  preferFreeDays: boolean; // whether free days should be emphasized
+  weights: PreferenceWeights; // relative importance weights
+}
+
+export interface UserSettings {
+  courseGroups: CourseGroup[];
+  preferences: UserPreferences;
+}
+
+// Weights definition (extracted after UserSettings to avoid circular ordering issues when patching)
+export interface PreferenceWeights {
+  professor: number;   // weight for professor ratings influence
+  timeSlot: number;    // weight for preferred time slots
+  freeDay: number;     // weight for having free days
+  compactness: number; // weight for schedule compactness metric
 }
 
 // User selection is simply a list of groups

@@ -153,6 +153,64 @@ ipcMain.handle('process-excel-data', async (_event, fileBuffer: number[]) => {
   }
 });
 
+// ---------------- User Settings Persistence ----------------
+// Path resolver helper (lazy because app.getPath only valid after ready)
+function getSettingsPath() {
+  const path = require('path');
+  return path.join(app.getPath('userData'), 'settings.json');
+}
+
+// Save settings (UserSettings object)
+ipcMain.handle('save-settings', async (_event, settings: any) => {
+  const fs = require('fs').promises;
+  try {
+    if (!settings || typeof settings !== 'object') {
+      return { success: false, message: 'Invalid settings payload' };
+    }
+    // Basic shape guard
+    if (!Array.isArray(settings.courseGroups)) settings.courseGroups = [];
+    if (!settings.preferences) {
+      settings.preferences = { preferredProfessors: [], timeSlotScores: {}, preferFreeDays: false };
+    }
+    const filePath = getSettingsPath();
+    const data = JSON.stringify(settings, null, 2);
+    await fs.mkdir(require('path').dirname(filePath), { recursive: true });
+    await fs.writeFile(filePath, data, 'utf-8');
+    return { success: true };
+  } catch (err: any) {
+    console.error('Error saving settings:', err);
+    return { success: false, message: err.message };
+  }
+});
+
+// Load settings
+ipcMain.handle('load-settings', async () => {
+  const fs = require('fs').promises;
+  const path = getSettingsPath();
+  try {
+    await fs.access(path);
+  } catch {
+    // file not found -> first run
+    return { success: true, data: null };
+  }
+  try {
+    const raw = await fs.readFile(path, 'utf-8');
+    let parsed: any = null;
+    try { parsed = JSON.parse(raw); } catch (e:any) {
+      console.error('Settings JSON parse error:', e);
+      return { success: false, data: null, message: 'Corrupted settings file' };
+    }
+    // minimal normalization
+    if (!parsed || typeof parsed !== 'object') return { success: false, data: null, message: 'Invalid settings structure' };
+    if (!Array.isArray(parsed.courseGroups)) parsed.courseGroups = [];
+    if (!parsed.preferences) parsed.preferences = { preferredProfessors: [], timeSlotScores: {}, preferFreeDays: false };
+    return { success: true, data: parsed };
+  } catch (err:any) {
+    console.error('Error loading settings:', err);
+    return { success: false, data: null, message: err.message };
+  }
+});
+
 // Window control channels
 ipcMain.on('win:minimize', (e) => {
   const win = BrowserWindow.fromWebContents(e.sender);

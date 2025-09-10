@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { CourseGroup } from './shared/types';
+import React, { useEffect, useState, useRef } from 'react';
+import { CourseGroup, UserSettings, UserPreferences, PreferenceWeights } from './shared/types';
 import CourseSelector from './CourseSelector';
 import CalendarView from './CalendarView';
 import PlanNavigator from './PlanNavigator';
@@ -11,6 +11,7 @@ import CourseDetails from './CourseDetails';
 import GroupManager from './GroupManager';
 import { GroupingOverlay } from './components/GroupingOverlay';
 import { ScheduleHeader } from './components/ScheduleHeader';
+import ScoreDetailsPanel from './components/ScoreDetailsPanel';
 import { GroupingConfig } from './grouping'; // (kept for potential future typing references)
 import { useCourseData } from './hooks/useCourseData';
 import { useScheduling } from './hooks/useScheduling';
@@ -25,21 +26,118 @@ const App: React.FC = () => {
   const { courseNames, courses, courseNameMapping, reload } = useCourseData();
   const [selected, setSelected] = useState<string[]>([]);
   // New: course groups (read from localStorage v2 if exists)
-  const [courseGroups, setCourseGroups] = useState<CourseGroup[]>(() => {
-    try {
-      const raw = localStorage.getItem('courseGroupsV2');
-      if (raw) return JSON.parse(raw);
-    } catch {}
-    return [];
-  });
+  const [courseGroups, setCourseGroups] = useState<CourseGroup[]>([]);
+  const [isDataLoaded, setIsDataLoaded] = useState(false); // جلوگیری از ذخیره قبل از بارگذاری
+  // نگهداری نسخه قبلی برای تشخیص تغییر
+  const lastSavedRef = useRef<string>('');
   // Modal to show full course list (CourseSelector) instead of inline massive list
   const [showCourseBrowser, setShowCourseBrowser] = useState(false);
   const { schedules, currentIdx, setCurrentIdx, loading, groupingConfig, setGroupingConfig, options, setOptions, generate } = useScheduling({ groups: [] });
+  const [preferences, setPreferences] = useState<any[]>([]);
+  // همگام سازی بین GroupManager (groupingConfig) و مدل جدید CourseGroup
+  useEffect(()=>{
+    if (!courses) return;
+    const legacy = groupingConfig.groups || [];
+    const prevMap: Record<string, CourseGroup> = {};
+    for (const g of courseGroups) prevMap[g.id] = g;
+    const derived: CourseGroup[] = legacy.map((g, idx) => {
+      const codes: string[] = [];
+      courses.forEach(c => { if (g.courseNames.includes(c.courseName)) codes.push(c.courseCode); });
+      const prev = prevMap[g.id];
+      return {
+        id: g.id,
+        name: g.name,
+        courseCodes: codes,
+        priority: prev?.priority || (idx===0? 'High' : idx<3? 'Medium':'Low'),
+        isActive: prev?.isActive !== undefined ? prev.isActive : true
+      };
+    });
+    setCourseGroups(derived);
+  }, [groupingConfig, courses]);
+
+  // ---------- Settings Persistence (IPC) ----------
+  // ساخت UserPreferences از آرایه preferences موجود (الگوی ساده استخراج)
+  const defaultWeights: PreferenceWeights = { professor:50, timeSlot:50, freeDay:50, compactness:50 };
+  const [prefWeights, setPrefWeights] = useState<PreferenceWeights>(defaultWeights);
+  const buildUserPreferences = (): UserPreferences => {
+    const preferredProfessorsSet = new Set<string>();
+    const timeSlotScores: Record<string, number> = {};
+    try {
+      preferences.forEach((p: any) => {
+        if (p.professorRatings) {
+          Object.entries(p.professorRatings).forEach(([prof, rating]) => {
+            if (typeof rating === 'number' && rating >= 4) preferredProfessorsSet.add(prof);
+          });
+        }
+        if (p.timeSlotRatings) {
+          Object.entries(p.timeSlotRatings).forEach(([slot, rating]) => {
+            if (typeof rating === 'number') {
+              // بالاترین امتیاز برای هر اسلات ذخیره شود
+              timeSlotScores[slot] = Math.max(timeSlotScores[slot] || 0, rating as number);
+            }
+          });
+        }
+      });
+    } catch {}
+    return {
+      preferredProfessors: Array.from(preferredProfessorsSet),
+      timeSlotScores,
+      preferFreeDays: true,
+  weights: prefWeights
+    };
+  };
+
+  // بارگذاری تنظیمات هنگام شروع
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await (window as any).api?.loadSettings?.();
+        if (res && res.success && res.data) {
+          const data: UserSettings = res.data;
+          if (Array.isArray(data.courseGroups)) setCourseGroups(data.courseGroups);
+          if (data.preferences && data.preferences.weights) {
+            setPrefWeights({
+              professor: data.preferences.weights.professor ?? 50,
+              timeSlot: data.preferences.weights.timeSlot ?? 50,
+              freeDay: data.preferences.weights.freeDay ?? 50,
+              compactness: data.preferences.weights.compactness ?? 50
+            });
+          }
+        }
+      } catch (e) {
+        console.warn('Settings load failed (fallback to empty):', e);
+      } finally {
+        setIsDataLoaded(true);
+      }
+    })();
+  }, []);
+
+  // ذخیره خودکار (debounced)
+  useEffect(() => {
+    if (!isDataLoaded) return; // صبر تا بارگذاری اولیه
+    const settings: UserSettings = {
+      courseGroups,
+      preferences: buildUserPreferences()
+    };
+    const serialized = JSON.stringify(settings);
+    if (serialized === lastSavedRef.current) return; // تغییری نکرده
+    const handle = setTimeout(() => {
+      (async () => {
+        try {
+          await (window as any).api?.saveSettings?.(settings);
+          lastSavedRef.current = serialized;
+        } catch (e) {
+          console.error('Failed to save settings:', e);
+        }
+      })();
+    }, 400); // debounce 400ms
+    return () => clearTimeout(handle);
+  }, [courseGroups, preferences, prefWeights, isDataLoaded]);
   // NOTE: useScheduling currently returns schedules as state but not a direct setter.
   // We simulate setSchedules via a local ref to mutate schedules array when using GA.
   // Quick workaround: extend hook or maintain a parallel local state when GA used.
   const [gaSchedules, setGASchedules] = useState<any[] | null>(null);
-  const [preferences, setPreferences] = useState<any[]>([]);
+  const [showScoreDetails, setShowScoreDetails] = useState(false);
   const [activeTab, setActiveTab] = useState<'courses' | 'preferences' | 'details'>('courses');
   // Theme (light/dark)
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -66,16 +164,20 @@ const App: React.FC = () => {
   // Genetic Algorithm schedule generation (group-aware)
   const generateGASchedules = async () => {
     if (!courses || !courses.length) { alert('ابتدا داده دروس را وارد کنید'); return; }
-    if (!courseGroups.length) { alert('ابتدا گروه درسی بسازید'); return; }
+  if (!courseGroups.length) { alert('ابتدا گروه درسی بسازید'); return; }
+  const activeGroups = courseGroups.filter(g => g.isActive);
+  if (!activeGroups.length) { alert('هیچ گروه فعالی برای محاسبه وجود ندارد (همه Off هستند).'); return; }
     setCurrentIdx(0);
     try {
       // Basic params can be tuned later / maybe add UI controls
       const minU = minUnits === '' ? 0 : Number(minUnits);
       const maxU = maxUnits === '' ? Infinity : Number(maxUnits || Infinity);
+      const userPrefsFull = buildUserPreferences();
       const gaResult = runGenetic({
-        courseGroups,
+        courseGroups: activeGroups,
         courses,
         preferences,
+        userPreferences: userPrefsFull,
         minUnits: minU,
         maxUnits: maxU
       }, { populationSize: 140, generations: 120 });
@@ -88,7 +190,8 @@ const App: React.FC = () => {
         const key = schedule.map(s => `${s.courseCode}_${s.sectionCode}`).sort().join('|');
         if (seen.has(key)) continue;
         seen.add(key);
-        const score = calculateScore(schedule as any, preferences as any, ind.genome as any, courseGroups as any);
+        // fitness already incorporates weighted scoring; we can expose as score directly
+        const score = ind.fitness;
         // Units
         const totalUnits = schedule.reduce((sum, s) => {
           const c = courses.find(cc => cc.courseCode === s.courseCode); return sum + (c?.units||0);
@@ -430,7 +533,7 @@ const App: React.FC = () => {
                   disabled={!courseNames.length}
                 >نمایش همه دروس ({courseNames.length})</button>
               </div>
-              {courseGroups.length === 0 ? (
+        {courseGroups.length === 0 ? (
                 <div style={{ fontSize:'11px', color:'var(--text-secondary)', lineHeight:1.6 }}>
                   هنوز گروهی ساخته نشده است. روی «مدیریت گروه‌های انتخابی» کلیک کنید تا گروه بسازید.
                 </div>
@@ -438,7 +541,7 @@ const App: React.FC = () => {
                 <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
                   <div style={{ fontSize:'11px', color:'var(--text-secondary)' }}>گروه‌های شما:</div>
                   <ul style={{ listStyle:'none', padding:0, margin:0, display:'flex', flexDirection:'column', gap:2, maxHeight:170, overflowY:'auto' }}>
-                    {courseGroups.map(g => (
+          {courseGroups.map(g => (
                       <li key={g.id} style={{
                         display:'grid',
                         gridTemplateColumns:'minmax(0,1fr) auto auto',
@@ -450,7 +553,7 @@ const App: React.FC = () => {
                         borderRadius:4,
                         position:'relative'
                       }}>
-                        <span style={{ fontSize:'11px', fontWeight:600, color:'var(--text-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{g.name}</span>
+                        <span style={{ fontSize:'11px', fontWeight:600, color: g.isActive? 'var(--text-primary)':'#f87171', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{g.name}</span>
                         <span style={{ fontSize:'9px', color:'var(--text-secondary)', padding:'2px 6px', borderRadius:4, background:'rgba(255,255,255,0.05)' }}>{g.courseCodes.length}</span>
                         <span style={{
                           fontSize:'9px',
@@ -573,6 +676,21 @@ const App: React.FC = () => {
               courses={courses || []}
               courseGroups={courseGroups}
               onPreferencesChange={setPreferences}
+              weights={prefWeights}
+              onWeightsChange={setPrefWeights}
+              onGroupOrderChange={(orderedIds)=>{
+                // Map ordered IDs to new priorities: first -> High, next two -> Medium, rest -> Low (保持 منطق قبلی تقریبی)
+                setCourseGroups(prev => {
+                  const idToIndex: Record<string, number> = {};
+                  orderedIds.forEach((id, idx)=>{ idToIndex[id]=idx; });
+                  return [...prev]
+                    .sort((a,b)=> (idToIndex[a.id]??999) - (idToIndex[b.id]??999))
+                    .map((g, idx) => ({
+                      ...g,
+                      priority: idx===0 ? 'High' : idx<3 ? 'Medium' : 'Low'
+                    }));
+                });
+              }}
             />
           </div>
         ) : (
@@ -619,7 +737,33 @@ const App: React.FC = () => {
       }}>
         {(gaSchedules ? gaSchedules : schedules).length > 0 ? (
           <>
-            <ScheduleHeader schedules={(gaSchedules? gaSchedules : schedules) as any} currentIdx={currentIdx} setCurrentIdx={setCurrentIdx} />
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12 }}>
+              <ScheduleHeader schedules={(gaSchedules? gaSchedules : schedules) as any} currentIdx={currentIdx} setCurrentIdx={setCurrentIdx} />
+              <button
+                onClick={()=>setShowScoreDetails(true)}
+                style={{
+                  background:'linear-gradient(90deg,#6366f1,#4f46e5)',
+                  border:'1px solid rgba(255,255,255,0.15)',
+                  color:'#fff',
+                  fontSize:12,
+                  fontWeight:600,
+                  padding:'10px 16px',
+                  borderRadius:10,
+                  cursor:'pointer',
+                  display:'flex',
+                  alignItems:'center',
+                  gap:6,
+                  boxShadow:'0 4px 14px -4px rgba(79,70,229,0.6)'
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <path d="M12 8v4"/>
+                  <path d="M12 16h.01"/>
+                </svg>
+                جزئیات امتیاز
+              </button>
+            </div>
             <div style={{ flex: 1, marginBottom: '24px' }}>
               <CalendarView schedule={(gaSchedules? gaSchedules : schedules)[currentIdx]} />
             </div>
@@ -671,6 +815,13 @@ const App: React.FC = () => {
             </p>
           </div>
         )}
+        <ScoreDetailsPanel
+          open={showScoreDetails}
+          onClose={()=>setShowScoreDetails(false)}
+          schedule={(gaSchedules? gaSchedules : schedules)[currentIdx] || null}
+          courseGroups={courseGroups.filter(g=>g.isActive)}
+          userPreferences={buildUserPreferences()}
+        />
       </div>
     </div>
     </>

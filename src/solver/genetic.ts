@@ -1,5 +1,5 @@
 // Genetic Algorithm (reworked) – now group-aware using CourseGroup
-import { Course, ScheduleSection, Section, CourseGroup } from '../shared/types';
+import { Course, ScheduleSection, Section, CourseGroup, UserPreferences } from '../shared/types';
 import { calculateScore } from './scoring';
 
 // ----- Representation -----
@@ -12,7 +12,8 @@ interface Individual { genome: Genome; fitness: number; units: number; }
 export interface GAInput {
   courseGroups: CourseGroup[];    // New grouping structure
   courses: Course[];              // Full course list with sections
-  preferences?: any[];            // User preferences (existing scoring model)
+  preferences?: any[];            // Legacy per-course preference objects
+  userPreferences?: UserPreferences; // Global weighted preferences (contains weights)
   minUnits?: number;
   maxUnits?: number;
 }
@@ -74,13 +75,21 @@ function conflictPenalty(schedule: ScheduleSection[]): number {
   return penalty;
 }
 
-function fitness(ind: Individual, courseIndex: Record<string, Course>, prefs: any[]|undefined, minUnits=0, maxUnits=Infinity, courseGroups?: CourseGroup[]): number {
+function fitness(
+  ind: Individual,
+  courseIndex: Record<string, Course>,
+  legacyPrefs: any[]|undefined,
+  userPrefs: UserPreferences | undefined,
+  minUnits=0,
+  maxUnits=Infinity,
+  courseGroups?: CourseGroup[]
+): number {
   const schedule = genomeToSchedule(ind.genome, courseIndex);
   const units = calcUnits(ind.genome, courseIndex);
   let penalty = conflictPenalty(schedule);
   if (units < minUnits) penalty += (minUnits-units)*5000;
   if (units > maxUnits) penalty += (units-maxUnits)*5000;
-  const raw = calculateScore(schedule as any, prefs as any, ind.genome as any, courseGroups as any);
+  const raw = calculateScore(schedule as any, legacyPrefs as any, ind.genome as any, courseGroups as any, userPrefs as any);
   ind.units = units;
   return raw - penalty;
 }
@@ -190,7 +199,7 @@ export function runGenetic(input: GAInput, params: Partial<GAParams> = {}): GARe
   const courseIndex = buildCourseIndex(input.courses);
 
   let population = initializePopulation(cfg.populationSize, input.courseGroups, courseIndex);
-  population.forEach(ind => ind.fitness = fitness(ind, courseIndex, input.preferences, input.minUnits, input.maxUnits, input.courseGroups));
+  population.forEach(ind => ind.fitness = fitness(ind, courseIndex, input.preferences, input.userPreferences, input.minUnits, input.maxUnits, input.courseGroups));
 
   const history: { gen: number; best: number; avg: number }[] = [];
   for (let gen=0; gen<cfg.generations; gen++) {
@@ -206,10 +215,10 @@ export function runGenetic(input: GAInput, params: Partial<GAParams> = {}): GARe
       const p1 = tournament(population);
       const p2 = tournament(population);
       const [c1,c2] = crossover(p1,p2,cfg.crossoverRate);
-      mutate(c1, input.courseGroups, courseIndex, cfg.mutationRate);
-      mutate(c2, input.courseGroups, courseIndex, cfg.mutationRate);
-  c1.fitness = fitness(c1, courseIndex, input.preferences, input.minUnits, input.maxUnits, input.courseGroups);
-  c2.fitness = fitness(c2, courseIndex, input.preferences, input.minUnits, input.maxUnits, input.courseGroups);
+  mutate(c1, input.courseGroups, courseIndex, cfg.mutationRate);
+  mutate(c2, input.courseGroups, courseIndex, cfg.mutationRate);
+  c1.fitness = fitness(c1, courseIndex, input.preferences, input.userPreferences, input.minUnits, input.maxUnits, input.courseGroups);
+  c2.fitness = fitness(c2, courseIndex, input.preferences, input.userPreferences, input.minUnits, input.maxUnits, input.courseGroups);
       next.push(c1);
       if (next.length < cfg.populationSize) next.push(c2);
     }
