@@ -74,6 +74,55 @@ export function generateSelectionScenarios(selected: string[], config: GroupingC
   return expandGroups(grouped);
 }
 
+// سناریوهای اختیاری: برای هر گروه امکان انتخاب صفر یا یک درس و برای دروس تکی امکان رد کردن
+// options.allowSkipSingles: امکان عدم انتخاب درس های تکی
+// options.maxCombinations: سقف تولید سناریو (برای جلوگیری از انفجار)
+export function generateOptionalScenarios(
+  selected: string[],
+  config: GroupingConfig,
+  options?: { allowSkipSingles?: boolean; maxCombinations?: number }
+): string[][] {
+  const { allowSkipSingles = true, maxCombinations = 5000 } = options || {};
+  const index = buildGroupIndex(config);
+  const groupBuckets: Record<string,string[]> = {};
+  const singles: string[] = [];
+  for (const name of selected) {
+    const gid = index[ normalizeName(name) ];
+    if (gid) {
+      if (!groupBuckets[gid]) groupBuckets[gid] = [];
+      if (!groupBuckets[gid].includes(name)) groupBuckets[gid].push(name);
+    } else if (!singles.includes(name)) singles.push(name);
+  }
+  const clusters: (string[])[] = [];
+  // هر کلاستر = گزینه های قابل انتخاب. برای گروه ها اجازه انتخاب هیچ (skip) را با null مجازی اضافه می‌کنیم.
+  for (const gid in groupBuckets) {
+    clusters.push([...groupBuckets[gid], '__SKIP__']);
+  }
+  for (const s of singles) {
+    clusters.push(allowSkipSingles ? [s, '__SKIP__'] : [s]);
+  }
+
+  const results: string[][] = [];
+  function dfs(i: number, acc: string[]) {
+    if (results.length >= maxCombinations) return; // محدودیت
+    if (i === clusters.length) {
+      if (acc.length > 0) results.push([...acc]);
+      return;
+    }
+    for (const option of clusters[i]) {
+      if (option === '__SKIP__') {
+        dfs(i+1, acc);
+      } else {
+        acc.push(option);
+        dfs(i+1, acc);
+        acc.pop();
+      }
+    }
+  }
+  dfs(0, []);
+  return results;
+}
+
 // مثال استفاده:
 // const config: GroupingConfig = { groups:[{ id:'math', name:'ریاضی', courseNames:['ریاضی عمومی 1','ریاضی عمومی 2']}] };
 // const scenarios = generateSelectionScenarios(['ریاضی عمومی 1','ریاضی عمومی 2','فیزیک 1'], config);

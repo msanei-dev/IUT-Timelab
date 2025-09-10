@@ -6,6 +6,8 @@ import PlanNavigator from './PlanNavigator';
 import DataInput from './DataInput';
 import PreferencePanel from './PreferencePanel';
 import CourseDetails from './CourseDetails';
+import GroupManager from './GroupManager';
+import { GroupingConfig } from './grouping';
 
 const api = (window as any).api;
 
@@ -18,6 +20,13 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [preferences, setPreferences] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'courses' | 'preferences' | 'details'>('courses');
+  // Grouping configuration state
+  const [groupingConfig, setGroupingConfig] = useState<GroupingConfig>({ groups: [] });
+  const [showGroups, setShowGroups] = useState(false); // overlay modal
+  const [selectedFaculty, setSelectedFaculty] = useState<string | null>(null); // prefix-based faculty selection
+  const [minUnits, setMinUnits] = useState<number | ''>('');
+  const [maxUnits, setMaxUnits] = useState<number | ''>('');
+  const [allowSkipping, setAllowSkipping] = useState<boolean>(true);
   
   // Map between display names and actual course names
   const [courseNameMapping, setCourseNameMapping] = useState<Map<string, string>>(new Map());
@@ -26,6 +35,7 @@ const App: React.FC = () => {
     // دریافت داده‌های کامل و ترکیب کد + نام
     api.getData().then((coursesData: any) => {
       setCourses(coursesData);
+  setSelectedFaculty(null); // reset faculty on data change
       if (coursesData && coursesData.courses) {
         const mapping = new Map<string, string>();
         const displayNames: string[] = [];
@@ -64,7 +74,17 @@ const App: React.FC = () => {
     console.log('Actual course names for API:', actualCourseNames);
     
     // Pass preferences to the scheduling algorithm
-    const result = await api.getRankedSchedules(actualCourseNames, preferences);
+  const result = await api.getRankedSchedules(
+      actualCourseNames,
+      preferences,
+      groupingConfig.groups.length ? groupingConfig : undefined,
+      {
+        minUnits: minUnits === '' ? 0 : Number(minUnits),
+        maxUnits: maxUnits === '' ? Infinity : Number(maxUnits),
+        allowSkipping,
+        scenarioLimit: 10000
+      }
+    );
     
     console.log('Schedule generation result:', result);
     
@@ -119,6 +139,60 @@ const App: React.FC = () => {
     
     setLoading(false);
   };
+
+  // استخراج «دانشکده» ها بر اساس پیشوند کد درس (فرض: سه رقم/کاراکتر اول)
+  const facultyPrefixes: string[] = React.useMemo(() => {
+    if (!courses) return [];
+    const set = new Set<string>();
+    courses.courses.forEach((c: any) => {
+      if (c.courseCode) {
+        const prefix = c.courseCode.toString().slice(0,2); // فقط دو رقم اول طبق درخواست
+        if (prefix) set.add(prefix);
+      }
+    });
+    return Array.from(set).sort();
+  }, [courses]);
+
+  // نگاشت prefix به لیبل نمایشی (در صورت نبود جدول واقعی، پیشوند خام)
+  const facultyNames: Record<string,string> = {
+    '11': 'مهندسی مواد',
+    '12': 'مهندسی معدن',
+    '13': 'مهندسی صنایع',
+    '14': 'مهندسی شیمی',
+    '15': 'مهندسی مکانیک',
+    '16': 'مهندسی عمران',
+    '17': 'برق و کامپیوتر',
+    '19': 'علوم ریاضی',
+    '20': 'فیزیک',
+    '21': 'شیمی',
+    '22': 'حمل و نقل',
+    '24': 'مهارت‌های فنی مهندسی',
+    '25': 'مرکز زبان',
+    '26': 'معارف',
+    '27': 'تربیت بدنی',
+    '34': 'نساجی',
+    '36': 'کشاورزی',
+    '37': 'منابع طبیعی',
+    'other': 'سایر'
+  };
+  const facultyLabel = (prefix: string) => facultyNames[prefix] || facultyNames['other'] || `دانشکده`;
+
+  // فیلتر نام‌های درس بر اساس دانشکده انتخابی
+  const filteredCourseNamesForGrouping: string[] = React.useMemo(() => {
+    if (!selectedFaculty) return courseNames.map(dn => courseNameMapping.get(dn) || dn);
+    if (!courses) return [];
+    const allowed = new Set(
+  courses.courses.filter((c: any) => c.courseCode && c.courseCode.toString().startsWith(selectedFaculty))
+        .map((c: any) => c.courseName)
+    );
+    // courseNames آرایه نمایش سکشن‌هاست؛ باید تبدیل به نام اصلی سپس فیلتر
+    const baseNames = new Set<string>();
+    courseNames.forEach(dn => {
+      const base = courseNameMapping.get(dn) || dn;
+      if (allowed.has(base)) baseNames.add(base);
+    });
+    return Array.from(baseNames).sort();
+  }, [selectedFaculty, courses, courseNames, courseNameMapping]);
 
   const clearAllData = async () => {
     if (confirm('آیا مطمئن هستید که می‌خواهید همه داده‌ها را حذف کنید؟\nاین عمل قابل بازگشت نیست.')) {
@@ -452,7 +526,10 @@ const App: React.FC = () => {
         padding: '20px 16px',
         boxSizing: 'border-box',
         overflowY: 'auto',
-        animation: 'slideInLeft 0.6s ease-out'
+        animation: 'slideInLeft 0.6s ease-out',
+        flexShrink: 0,
+        position: 'relative',
+        zIndex: 2
       }}>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '20px' }}>
@@ -535,11 +612,16 @@ const App: React.FC = () => {
         </div>
 
         {activeTab === 'courses' ? (
-          <div className="card" style={{ padding: '16px' }}>
+          <div className="card" style={{ padding: '16px', position:'relative' }}>
             <DataInput 
               onDataSubmit={handleDataSubmit} 
               onFileUpload={handleFileUpload}
             />
+            <button
+              onClick={() => setShowGroups(true)}
+              className="btn btn-secondary"
+              style={{ width:'100%', marginTop:'8px', fontSize:'12px', fontWeight:600 }}
+            >مدیریت گروه‌های انتخابی</button>
             
             {courseNames.length > 0 && (
               <div style={{ marginTop: '16px' }}>
@@ -552,70 +634,82 @@ const App: React.FC = () => {
             )}
             
             {/* Action Buttons */}
-            <div style={{
-              display: 'flex',
-              gap: '8px',
-              marginTop: '16px'
-            }}>
-              <button 
-                onClick={generateSchedules} 
-                disabled={selected.length === 0 || loading} 
-                className="btn btn-primary"
-                style={{
-                  flex: 2,
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  padding: '8px 12px'
-                }}
-              >
-                <svg className="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                  <polyline points="14,2 14,8 20,8" />
-                  <line x1="16" y1="13" x2="8" y2="13" />
-                  <line x1="16" y1="17" x2="8" y2="17" />
-                  <polyline points="10,9 9,9 8,9" />
-                </svg>
-                {loading ? 'تولید...' : 'تولید برنامه'}
-              </button>
-              
-              <button 
-                onClick={clearAllData}
-                disabled={loading}
-                className="btn btn-danger"
-                style={{
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  padding: '8px 12px'
-                }}
-                title="حذف همه داده‌ها"
-              >
-                <svg className="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="3,6 5,6 21,6" />
-                  <path d="M19,6v14a2,2,0,0,1-2,2H7a2,2,0,0,1-2-2V6m3,0V4a2,2,0,0,1,2,2h4a2,2,0,0,1,2,2V6" />
-                  <line x1="10" y1="11" x2="10" y2="17" />
-                  <line x1="14" y1="11" x2="14" y2="17" />
-                </svg>
-                حذف
-              </button>
-              
-              <button 
-                onClick={importFromExcel}
-                disabled={loading}
-                className="btn btn-secondary"
-                style={{
-                  fontSize: '12px',
-                  fontWeight: '600',
-                  padding: '8px 12px'
-                }}
-                title="خواندن دروس از فایل اکسل"
-              >
-                <svg className="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                  <polyline points="14,2 14,8 20,8" />
-                  <path d="M9 15h6M9 12h6M9 9h6" />
-                </svg>
-                اکسل
-              </button>
+            <div style={{ display:'flex', flexDirection:'column', gap:'10px', marginTop:'16px' }}>
+              <div style={{ display:'flex', gap:'8px' }}>
+                <div style={{ flex:1 }}>
+                  <label style={{ display:'block', fontSize:'10px', fontWeight:600, marginBottom:4 }}>حداقل واحد</label>
+                  <input type="number" min={0} value={minUnits} onChange={e => setMinUnits(e.target.value===''?'' : Number(e.target.value))} className="form-control" style={{ fontSize:'12px', padding:'6px 8px' }} placeholder="مثلاً 12" />
+                </div>
+                <div style={{ flex:1 }}>
+                  <label style={{ display:'block', fontSize:'10px', fontWeight:600, marginBottom:4 }}>حداکثر واحد</label>
+                  <input type="number" min={0} value={maxUnits} onChange={e => setMaxUnits(e.target.value===''?'' : Number(e.target.value))} className="form-control" style={{ fontSize:'12px', padding:'6px 8px' }} placeholder="مثلاً 20" />
+                </div>
+                <div style={{ flex:1, display:'flex', alignItems:'flex-end' }}>
+                  <label style={{ fontSize:'10px', fontWeight:600, display:'flex', alignItems:'center', gap:4, cursor:'pointer' }}>
+                    <input type="checkbox" checked={allowSkipping} onChange={e => setAllowSkipping(e.target.checked)} />
+                    اجازه حذف
+                  </label>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button 
+                  onClick={generateSchedules} 
+                  disabled={selected.length === 0 || loading} 
+                  className="btn btn-primary"
+                  style={{
+                    flex: 2,
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    padding: '8px 12px'
+                  }}
+                >
+                  <svg className="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14,2 14,8 20,8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                    <polyline points="10,9 9,9 8,9" />
+                  </svg>
+                  {loading ? 'تولید...' : 'تولید برنامه'}
+                </button>
+                <button 
+                  onClick={clearAllData}
+                  disabled={loading}
+                  className="btn btn-danger"
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    padding: '8px 12px'
+                  }}
+                  title="حذف همه داده‌ها"
+                >
+                  <svg className="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="3,6 5,6 21,6" />
+                    <path d="M19,6v14a2,2,0,0,1-2,2H7a2,2,0,0,1-2-2V6m3,0V4a2,2,0,0,1,2,2h4a2,2,0,0,1,2,2V6" />
+                    <line x1="10" y1="11" x2="10" y2="17" />
+                    <line x1="14" y1="11" x2="14" y2="17" />
+                  </svg>
+                  حذف
+                </button>
+                <button 
+                  onClick={importFromExcel}
+                  disabled={loading}
+                  className="btn btn-secondary"
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    padding: '8px 12px'
+                  }}
+                  title="خواندن دروس از فایل اکسل"
+                >
+                  <svg className="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14,2 14,8 20,8" />
+                    <path d="M9 15h6M9 12h6M9 9h6" />
+                  </svg>
+                  اکسل
+                </button>
+              </div>
             </div>
           </div>
         ) : activeTab === 'preferences' ? (
@@ -635,14 +729,62 @@ const App: React.FC = () => {
         )}
       </div>
       
+      {/* Overlay Group Manager */}
+      {showGroups && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.3)', backdropFilter:'blur(2px)', display:'flex', justifyContent:'center', alignItems:'flex-start', padding:'40px 32px', zIndex:1000 }}>
+          <div style={{ width:'780px', maxWidth:'100%', background:'#fff', borderRadius:'18px', boxShadow:'0 12px 32px rgba(0,0,0,0.25)', position:'relative', display:'flex', flexDirection:'column', maxHeight:'calc(100vh - 80px)' }}>
+            <div style={{ padding:'14px 22px', borderBottom:'1px solid var(--border-light)', display:'flex', alignItems:'center', justifyContent:'space-between', gap:'12px' }}>
+              <h2 style={{ margin:0, fontSize:'1.15rem', fontWeight:700 }}>مدیریت گروه‌های انتخابی</h2>
+              <div style={{ display:'flex', gap:'8px', alignItems:'center' }}>
+                {selectedFaculty && (
+                  <>
+                    <span style={{ fontSize:'0.8rem', color:'var(--text-secondary)' }}>{facultyLabel(selectedFaculty)}</span>
+                    <button onClick={()=>setSelectedFaculty(null)} className="btn btn-secondary" style={{ fontSize:'0.65rem', padding:'4px 10px' }}>تغییر دانشکده</button>
+                  </>
+                )}
+                <button onClick={()=>setShowGroups(false)} className="btn btn-danger" style={{ fontSize:'0.7rem' }}>بستن</button>
+              </div>
+            </div>
+            {!selectedFaculty ? (
+              <div style={{ padding:'24px', overflow:'auto', display:'flex', flexDirection:'column', gap:'20px' }}>
+                <div>
+                  <h3 style={{ margin:'0 0 12px 0', fontSize:'1rem' }}>انتخاب دانشکده</h3>
+                  <p style={{ margin:0, fontSize:'0.8rem', color:'var(--text-secondary)' }}>ابتدا دانشکده (بر اساس پیشوند کد درس) را انتخاب کنید تا فقط همان دروس برای گروه‌بندی نمایش داده شوند.</p>
+                </div>
+                <div style={{ display:'grid', gap:'12px', gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))' }}>
+                  {facultyPrefixes.map(p => (
+                    <button key={p} onClick={()=>setSelectedFaculty(p)} className="btn btn-primary" style={{ fontSize:'0.8rem', padding:'12px 8px', fontWeight:600 }} title={facultyLabel(p)}>
+                      {facultyLabel(p)}
+                    </button>
+                  ))}
+                  {facultyPrefixes.length===0 && <div style={{ fontSize:'0.75rem', color:'var(--text-secondary)' }}>داده‌ای برای استخراج دانشکده موجود نیست.</div>}
+                </div>
+              </div>
+            ) : (
+              <div style={{ flex:1, overflow:'auto', padding:'16px 16px 20px 16px' }}>
+                <GroupManager
+                  allCourseNames={filteredCourseNamesForGrouping}
+                  value={groupingConfig}
+                  onChange={setGroupingConfig}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Main Content */}
       <div className="card" style={{
         flex: 1,
+        minWidth: 0,
         padding: '20px',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'stretch',
-        animation: 'fadeInUp 0.6s ease-out'
+        animation: 'fadeInUp 0.6s ease-out',
+        position: 'relative',
+        zIndex: 1,
+        overflow: 'hidden'
       }}>
         {schedules.length > 0 ? (
           <>

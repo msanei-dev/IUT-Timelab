@@ -2,7 +2,7 @@
 import fs from 'fs';
 import path from 'path';
 import { DataFile, Course, Section, ScheduleSection, TimeSlot, Day } from './shared/types';
-import { GroupingConfig, generateSelectionScenarios } from './grouping';
+import { GroupingConfig, generateSelectionScenarios, buildGroupIndex, generateOptionalScenarios } from './grouping';
 
 // Load data.json
 export function loadData(): DataFile {
@@ -112,27 +112,72 @@ export function findSchedules(
   return results;
 }
 
-// Scoring function
-export function calculateScore(schedule: ScheduleSection[]): number {
+// Scoring function improved with user preferences (priority, professor rating, time slot rating)
+// preferences: [{ courseCode, priority (1=highest visual order), professorRatings, timeSlotRatings }]
+interface UserPreference {
+  courseCode: string;
+  courseName: string;
+  priority: number; // lower means higher priority visually
+  professorRatings: Record<string, number>;
+  timeSlotRatings: Record<string, number>; // key: Day-start-end
+}
+
+const PRIORITY_WEIGHT = 60;      // وزن تاثیر اولویت کلی درس
+const PROFESSOR_WEIGHT = 25;     // وزن هر امتیاز استاد (انحراف از 3)
+const TIMESLOT_WEIGHT = 8;       // وزن هر امتیاز بازه زمانی (انحراف از 3)
+const ATTENDANCE_BONUS = 40;     // پاداش اگر حضور و غیاب نگیرد
+const EARLY_CLASS_BONUS = 10;    // کلاس شروع قبل 10
+const LATE_CLASS_PENALTY = 30;   // کلاس پایان بعد 13
+const FREE_DAY_BONUS = 60;       // پاداش هر روز آزاد
+
+export function calculateScore(schedule: ScheduleSection[], preferences?: UserPreference[]): number {
   let score = 0;
   const days: Record<Day, number> = {
     Saturday: 0, Sunday: 0, Monday: 0, Tuesday: 0, Wednesday: 0, Thursday: 0, Friday: 0
   };
 
+  const prefMap: Record<string, UserPreference> = {};
+  if (preferences) {
+    for (const p of preferences) prefMap[p.courseCode] = p as UserPreference;
+  }
+
+  // Find max priority to invert (priority starts at 1 up to N)
+  const maxPriority = preferences && preferences.length ? Math.max(...preferences.map(p => p.priority)) : 0;
+
   for (const sec of schedule) {
-    // Professor's Attendance
-    if (!sec.professor.takesAttendance) score += 100;
+    const pref = prefMap[sec.courseCode];
+    if (pref) {
+      // Priority: higher score for smaller priority number
+      const inverted = (maxPriority + 1 - pref.priority); // if priority=1 and max=5 => 5
+      score += inverted * PRIORITY_WEIGHT;
+    }
+
+    // Professor based rating
+    if (pref && pref.professorRatings) {
+      const r = pref.professorRatings[sec.professor.name];
+      if (r) score += (r - 3) * PROFESSOR_WEIGHT; // center at neutral 3
+    }
+
+    // Attendance bonus
+    if (!sec.professor.takesAttendance) score += ATTENDANCE_BONUS;
+
     for (const slot of sec.schedule) {
-      // Time of Day
-      if (slot.end > '13:00') score -= 50;
-      if (slot.start < '10:00') score += 20;
+      // Time of Day heuristics (legacy heuristic kept smaller)
+      if (slot.end > '13:00') score -= LATE_CLASS_PENALTY;
+      if (slot.start < '10:00') score += EARLY_CLASS_BONUS;
       days[slot.day]++;
+
+      if (pref && pref.timeSlotRatings) {
+        const key = `${slot.day}-${slot.start}-${slot.end}`;
+        const tr = pref.timeSlotRatings[key];
+        if (tr) score += (tr - 3) * TIMESLOT_WEIGHT; // center at 3
+      }
     }
   }
-  // Free days
-  for (const d in days) {
-    if (days[d as Day] === 0) score += 75;
-  }
+
+  // Free days bonus
+  for (const d in days) if (days[d as Day] === 0) score += FREE_DAY_BONUS;
+
   return score;
 }
 
@@ -216,13 +261,46 @@ function analyzeConflicts(courses: Course[], desiredCourseNames: string[]) {
 }
 
 // Main API: get ranked schedules with conflict analysis
-export function getRankedSchedules(desiredCourseNames: string[], preferences?: any[], groupingConfig?: GroupingConfig): any {
+interface ScheduleOptions {
+  minUnits?: number;           // حداقل واحد مجاز
+  maxUnits?: number;           // حداکثر واحد مجاز
+  allowSkipping?: boolean;     // اجازه رد کردن برخی دروس/گروه ها
+  scenarioLimit?: number;      // سقف سناریو
+}
+
+// Main API
+export function getRankedSchedules(
+  desiredCourseNames: string[],
+  preferences?: any[],
+  groupingConfig?: GroupingConfig,
+  options?: ScheduleOptions
+): any {
   const data = loadData();
+  const { minUnits = 0, maxUnits = Infinity, allowSkipping = false, scenarioLimit = 8000 } = options || {};
 
   // اگر گروه‌بندی تعریف شده باشد، چند سناریو تولید می‌کنیم و نتایج را ادغام
-  const scenarios = groupingConfig
-    ? generateSelectionScenarios(desiredCourseNames, groupingConfig)
-    : [desiredCourseNames];
+  let scenarios: string[][];
+  if (groupingConfig) {
+    scenarios = allowSkipping
+      ? generateOptionalScenarios(desiredCourseNames, groupingConfig, { allowSkipSingles: true, maxCombinations: scenarioLimit })
+      : generateSelectionScenarios(desiredCourseNames, groupingConfig);
+  } else {
+    // اگر گروه بندی نداریم ولی اجازه رد کردن هست، زیردسته های همه دروس را تولید می‌کنیم (powerset محدود)
+    if (allowSkipping) {
+      const base: string[] = [...desiredCourseNames];
+      scenarios = [[]];
+      for (const name of base) {
+        const current = [...scenarios];
+        for (const partial of current) {
+          const next = [...partial, name];
+          if (scenarios.length < scenarioLimit) scenarios.push(next);
+        }
+      }
+      scenarios = scenarios.filter(s => s.length>0); // حذف حالت خالی
+    } else {
+      scenarios = [desiredCourseNames];
+    }
+  }
 
   let allSchedules: ScheduleSection[][] = [];
   for (const scenario of scenarios) {
@@ -247,15 +325,28 @@ export function getRankedSchedules(desiredCourseNames: string[], preferences?: a
     console.log('Conflict analysis:', conflictAnalysis);
   }
   
-  // Score schedules
-  const scoredSchedules = schedules.map(sections => ({
-    sections,
-    score: calculateScore(sections)
-  })).sort((a, b) => b.score - a.score);
+  // Build group mapping for metadata
+  const groupIndex = groupingConfig ? buildGroupIndex(groupingConfig) : null;
+
+  // Score schedules with preferences
+  const scoredSchedules = schedules.map(sections => {
+    const score = calculateScore(sections, preferences as any);
+    // فیلتر واحدها
+    const totalUnits = sections.reduce((sum, s) => {
+      const course = data.courses.find(c => c.courseCode === s.courseCode);
+      return sum + (course?.units || 0);
+    }, 0);
+    if (totalUnits < minUnits || totalUnits > maxUnits) return null;
+    const groupsMeta = groupIndex ? sections.map(sec => {
+      const gId = groupIndex[sec.courseName.replace(/\s+/g,'').toLowerCase()] || null;
+      return gId ? { groupId: gId, courseName: sec.courseName } : null;
+    }).filter(Boolean) : [];
+    return { sections, score, groupsMeta, units: totalUnits };
+  }).filter(Boolean).sort((a: any, b: any) => b.score - a.score);
   
   // آمار برنامه‌ها
   const stats = {
-    totalSchedules: schedules.length,
+    totalSchedules: (scoredSchedules as any).length,
     totalCoursesOriginalSelection: desiredCourseNames.length,
     scenariosTried: scenarios.length,
     totalDistinctCoursesUsed: new Set(schedules.flatMap(s => s.map(x => x.courseName))).size
@@ -264,7 +355,8 @@ export function getRankedSchedules(desiredCourseNames: string[], preferences?: a
   return {
     schedules: scoredSchedules,
     conflicts: conflictAnalysis,
-    stats,
-    grouping: groupingConfig ? { groups: groupingConfig.groups.length, scenarios: scenarios.length } : undefined
+  stats,
+  grouping: groupingConfig ? { groups: groupingConfig.groups.length, scenarios: scenarios.length } : undefined,
+  options: { minUnits, maxUnits, allowSkipping, scenarioLimit }
   };
 }
