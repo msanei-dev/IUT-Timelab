@@ -84,33 +84,33 @@ MIT License. See [LICENSE](LICENSE) for details.
 
 Developed by students at Isfahan University of Technology.
 
-## 🛠 افزودن ترجیحات جدید
-در حال حاضر ساختار ساده است؛ برای توسعه:
-1. تعریف نوع/کلید ترجیح
-2. افزودن وزن و تابع محاسبه در solver
-3. جمع‌بندی امتیاز در مرحله رتبه‌بندی
+## 🛠 Adding New Preferences
+The current structure is simple; to extend:
+1. Define a new preference type/key
+2. Add its weight and calculation function in the solver
+3. Aggregate the score in the ranking phase
 
-## 📥 ورود داده از اکسل (طرح آینده)
-`excelUtils.ts` می‌تواند توسعه یابد تا:
-1. فایل Excel (`xlsx`) خوانده شود
-2. ستون‌ها به ساختار استاندارد درس تبدیل گردد
-3. کش یا JSON نرمال ذخیره شود
+## 📥 Excel Data Import (Planned)
+`excelUtils.ts` can be extended to:
+1. Read Excel (`xlsx`) files
+2. Convert columns to the standard course structure
+3. Store as cache or normalized JSON
 
-## 🚀 مسیرهای توسعه پیشنهادی
-- محدودسازی پیچیدگی ترکیبات گروه (Pruning)
-- رابط گرافیکی برای ترجیحات (Drag sliders / weights)
-- Export برنامه به PDF / تصویر
-- Sync ابری یا اشتراک لینک
-- iCal (.ics) خروجی
-- اعتبارسنجی پیشرفتهٔ فرمت زمان (جلوگیری از اشتباه تایپی)
+## 🚀 Suggested Development Roadmap
+- Limit group combination complexity (pruning)
+- GUI for preferences (drag sliders/weights)
+- Export schedule to PDF/image
+- Cloud sync or shareable links
+- iCal (.ics) export
+- Advanced time format validation (prevent typos)
 
-## 🤝 مشارکت
-Fork → Branch → Commit با پیام معنادار → Pull Request. پیش از PR:
+## 🤝 Contributing
+Fork → Branch → Commit with meaningful message → Pull Request. Before PR:
 ```powershell
 npm run lint
 ```
 
-## ⚖️ مجوز
+## ⚖️ License
 MIT License
 
 ## ✨ نام پروژه
