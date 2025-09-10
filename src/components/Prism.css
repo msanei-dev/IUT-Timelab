@@ -1,0 +1,3 @@
+.prism-container{position:absolute;inset:0;overflow:hidden;pointer-events:none;}
+.prism-container canvas{filter:blur(0px) saturate(120%) brightness(0.9);mix-blend-mode:screen;opacity:0.55;}
+:root[data-theme='dark'] .prism-container canvas{mix-blend-mode:plus-lighter;opacity:0.4;}

@@ -8,5 +8,12 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.invoke('get-ranked-schedules', desiredCourseNames, preferences, groupingConfig, options),
   saveData: (data: any) => ipcRenderer.invoke('save-data', data),
   importExcel: () => ipcRenderer.invoke('import-excel'),
-  processExcelData: (fileBuffer: number[]) => ipcRenderer.invoke('process-excel-data', fileBuffer)
+  processExcelData: (fileBuffer: number[]) => ipcRenderer.invoke('process-excel-data', fileBuffer),
+  windowControls: {
+    minimize: () => ipcRenderer.send('win:minimize'),
+    toggleMaximize: () => ipcRenderer.send('win:toggle-max'),
+    close: () => ipcRenderer.send('win:close'),
+    onMaximizeState: (cb: (isMax: boolean) => void) => ipcRenderer.on('win:is-maximized', (_e, v) => cb(v))
+  ,getIsMaximized: () => ipcRenderer.invoke('win:get-max')
+  }
 });

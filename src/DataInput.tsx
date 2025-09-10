@@ -186,7 +186,7 @@ const DataInput: React.FC<Props> = ({ onDataSubmit, onFileUpload }) => {
         <h3 className="font-bold text-text" style={{ 
           fontSize: '1.25rem',
           margin: 0,
-          color: 'var(--text-color)'
+          color: 'var(--text-primary)'
         }}>
           ورود داده‌های درسی
         </h3>
@@ -208,7 +208,7 @@ const DataInput: React.FC<Props> = ({ onDataSubmit, onFileUpload }) => {
             resize: 'vertical',
             boxSizing: 'border-box',
             background: 'var(--input-bg)',
-            color: 'var(--text-color)',
+            color: 'var(--text-primary)',
             outline: 'none',
             transition: 'all 0.3s ease',
             border: '1px solid var(--glass-border)'

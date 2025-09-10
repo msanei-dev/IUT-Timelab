@@ -308,7 +308,8 @@ const CourseSelector: React.FC<Props> = ({ courseNames, selected, setSelected })
               flex: 1,
               fontSize: '11px',
               fontWeight: '600',
-              padding: '6px 10px'
+              padding: '6px 10px',
+              color: 'var(--text-primary)'
             }}
           >
             <svg className="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -324,7 +325,8 @@ const CourseSelector: React.FC<Props> = ({ courseNames, selected, setSelected })
               flex: 1,
               fontSize: '11px',
               fontWeight: '600',
-              padding: '6px 10px'
+              padding: '6px 10px',
+              color: 'var(--text-primary)'
             }}
           >
             <svg className="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

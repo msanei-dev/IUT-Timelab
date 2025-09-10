@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { CourseGroup } from './shared/types';
 
 interface Professor {
   name: string;
@@ -23,62 +24,109 @@ interface Course {
   sections: Section[];
 }
 
-interface CoursePreference {
+// Legacy downstream scoring expects course-level preferences.
+export interface CoursePreference {
   courseCode: string;
   courseName: string;
-  priority: number;
-  professorRatings: Record<string, number>; // professor name -> rating (1-5)
-  timeSlotRatings: Record<string, number>; // "day-start-end" -> rating (1-5)
+  priority: number; // derived from group order (1 = highest)
+  professorRatings: Record<string, number>;
+  timeSlotRatings: Record<string, number>;
+}
+
+// New group preference structure stored in UI state
+interface GroupPreference {
+  groupId: string;
+  groupName: string;
+  priority: number; // order-based
+  professorRatings: Record<string, number>; // aggregated unique professors across group
+  timeSlotRatings: Record<string, number>;  // aggregated unique time slots across group
 }
 
 interface PreferencePanelProps {
   courses: Course[];
+  courseGroups: CourseGroup[];
   onPreferencesChange: (preferences: CoursePreference[]) => void;
-  selectedCourses: string[];
 }
 
 const PreferencePanel: React.FC<PreferencePanelProps> = ({ 
   courses, 
-  onPreferencesChange, 
-  selectedCourses 
+  courseGroups,
+  onPreferencesChange
 }) => {
-  const [preferences, setPreferences] = useState<CoursePreference[]>([]);
-  const [expandedCourse, setExpandedCourse] = useState<string | null>(null);
+  const [groupPrefs, setGroupPrefs] = useState<GroupPreference[]>([]);
+  const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
-  // Initialize preferences when selected courses change
-  useEffect(() => {
-    const filteredCourses = courses.filter(course => 
-      selectedCourses.includes(course.courseName)
-    );
+  // Index courses by code for fast lookup
+  const courseIndex = useMemo(()=>{
+    const m: Record<string, Course> = {};
+    for (const c of courses) m[c.courseCode] = c; return m;
+  }, [courses]);
 
-    const newPreferences = filteredCourses.map((course, index) => {
-      const existing = preferences.find(p => p.courseCode === course.courseCode);
-      if (existing) return existing;
+  // Build / merge group preferences when courseGroups change (with persistence)
+  useEffect(()=>{
+    // Load persisted ratings once per rebuild
+    let stored: GroupPreference[] = [];
+    try {
+      const raw = localStorage.getItem('groupPreferencesV1');
+      if (raw) stored = JSON.parse(raw);
+    } catch {}
+    const storedMap: Record<string, GroupPreference> = {};
+    for (const gp of stored) storedMap[gp.groupId] = gp;
 
-      const professorRatings: Record<string, number> = {};
-      const timeSlotRatings: Record<string, number> = {};
-
-      course.sections.forEach(section => {
-        professorRatings[section.professor.name] = 3; // Default rating
-        section.schedule.forEach(slot => {
-          const slotKey = `${slot.day}-${slot.start}-${slot.end}`;
-          timeSlotRatings[slotKey] = 3; // Default rating
-        });
-      });
-
-      return {
-        courseCode: course.courseCode,
-        courseName: course.courseName,
-        priority: index + 1,
-        professorRatings,
-        timeSlotRatings
-      };
+    const next: GroupPreference[] = courseGroups.map((g, idx) => {
+      // Collect current professors & time slots
+      const profDefaults: Record<string, number> = {};
+      const timeDefaults: Record<string, number> = {};
+      for (const code of g.courseCodes) {
+        const course = courseIndex[code]; if (!course) continue;
+        for (const section of course.sections) {
+          if (!(section.professor.name in profDefaults)) profDefaults[section.professor.name] = 3;
+          for (const slot of section.schedule) {
+            const key = `${slot.day}-${slot.start}-${slot.end}`;
+            if (!(key in timeDefaults)) timeDefaults[key] = 3;
+          }
+        }
+      }
+      const existing = groupPrefs.find(p => p.groupId === g.id) || storedMap[g.id];
+      if (existing) {
+        // merge in any new professors / time slots with default rating 3
+        const mergedProf: Record<string, number> = { ...profDefaults, ...existing.professorRatings };
+        const mergedTime: Record<string, number> = { ...timeDefaults, ...existing.timeSlotRatings };
+        return { ...existing, groupName: g.name, priority: idx+1, professorRatings: mergedProf, timeSlotRatings: mergedTime };
+      }
+      return { groupId: g.id, groupName: g.name, priority: idx+1, professorRatings: profDefaults, timeSlotRatings: timeDefaults };
     });
+    setGroupPrefs(next);
+  }, [courseGroups, courseIndex]);
 
-    setPreferences(newPreferences);
-    onPreferencesChange(newPreferences);
-  }, [selectedCourses, courses]);
+  // Persist group preferences when they change
+  useEffect(()=>{
+    try {
+      localStorage.setItem('groupPreferencesV1', JSON.stringify(groupPrefs));
+    } catch {}
+  }, [groupPrefs]);
+
+  // Propagate flattened course preferences to parent whenever groupPrefs change
+  useEffect(()=>{
+    const flattened: CoursePreference[] = [];
+    // group priority: earlier index higher priority (priority field is index+1)
+    const ordered = [...groupPrefs].sort((a,b)=>a.priority-b.priority);
+    ordered.forEach((gp, orderIdx) => {
+      for (const group of courseGroups.filter(g=>g.id===gp.groupId)) {
+        for (const code of group.courseCodes) {
+          const course = courseIndex[code]; if (!course) continue;
+          // Filter ratings to only relevant professors/time slots for this course
+          const pr: Record<string, number> = {};
+            course.sections.forEach(sec => { if (gp.professorRatings[sec.professor.name]!=null) pr[sec.professor.name] = gp.professorRatings[sec.professor.name]; });
+          const tr: Record<string, number> = {};
+            course.sections.forEach(sec => sec.schedule.forEach(slot => { const key = `${slot.day}-${slot.start}-${slot.end}`; if (gp.timeSlotRatings[key]!=null) tr[key] = gp.timeSlotRatings[key]; }));
+          flattened.push({ courseCode: course.courseCode, courseName: course.courseName, priority: orderIdx+1, professorRatings: pr, timeSlotRatings: tr });
+        }
+      }
+    });
+    onPreferencesChange(flattened);
+  }, [groupPrefs, courseGroups, courseIndex, onPreferencesChange]);
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedIndex(index);
@@ -92,66 +140,25 @@ const PreferencePanel: React.FC<PreferencePanelProps> = ({
 
   const handleDrop = (e: React.DragEvent, dropIndex: number) => {
     e.preventDefault();
-    
     if (draggedIndex === null || draggedIndex === dropIndex) {
       setDraggedIndex(null);
       return;
     }
-
-    const newPreferences = [...preferences];
-    const draggedItem = newPreferences[draggedIndex];
-    
-    // Remove dragged item
-    newPreferences.splice(draggedIndex, 1);
-    
-    // Insert at new position
-    newPreferences.splice(dropIndex, 0, draggedItem);
-    
-    // Update priorities
-    const updatedPreferences = newPreferences.map((pref, index) => ({
-      ...pref,
-      priority: index + 1
-    }));
-
-    setPreferences(updatedPreferences);
-    onPreferencesChange(updatedPreferences);
+    const arr = [...groupPrefs];
+    const draggedItem = arr[draggedIndex];
+    arr.splice(draggedIndex,1);
+    arr.splice(dropIndex,0,draggedItem);
+    // Reassign priority (index+1)
+    const reassigned = arr.map((g,i)=> ({ ...g, priority: i+1 }));
+    setGroupPrefs(reassigned);
     setDraggedIndex(null);
   };
-
-  const updateProfessorRating = (courseCode: string, professorName: string, rating: number) => {
-    const updatedPreferences = preferences.map(pref => {
-      if (pref.courseCode === courseCode) {
-        return {
-          ...pref,
-          professorRatings: {
-            ...pref.professorRatings,
-            [professorName]: rating
-          }
-        };
-      }
-      return pref;
-    });
-
-    setPreferences(updatedPreferences);
-    onPreferencesChange(updatedPreferences);
+  const updateProfessorRating = (groupId: string, professorName: string, rating: number) => {
+    setGroupPrefs(gps => gps.map(g => g.groupId===groupId ? { ...g, professorRatings: { ...g.professorRatings, [professorName]: rating } }: g));
   };
 
-  const updateTimeSlotRating = (courseCode: string, slotKey: string, rating: number) => {
-    const updatedPreferences = preferences.map(pref => {
-      if (pref.courseCode === courseCode) {
-        return {
-          ...pref,
-          timeSlotRatings: {
-            ...pref.timeSlotRatings,
-            [slotKey]: rating
-          }
-        };
-      }
-      return pref;
-    });
-
-    setPreferences(updatedPreferences);
-    onPreferencesChange(updatedPreferences);
+  const updateTimeSlotRating = (groupId: string, slotKey: string, rating: number) => {
+    setGroupPrefs(gps => gps.map(g => g.groupId===groupId ? { ...g, timeSlotRatings: { ...g.timeSlotRatings, [slotKey]: rating } }: g));
   };
 
   const StarRating: React.FC<{ rating: number; onChange: (rating: number) => void; size?: string }> = ({ 
@@ -219,7 +226,7 @@ const PreferencePanel: React.FC<PreferencePanelProps> = ({
     return `${dayMap[day] || day} ${start}-${end}`;
   };
 
-  if (preferences.length === 0) {
+  if (courseGroups.length === 0) {
     return (
       <div className="glass-card" style={{ 
         padding: '40px', 
@@ -254,19 +261,19 @@ const PreferencePanel: React.FC<PreferencePanelProps> = ({
           </div>
           <div>
             <h3 style={{ 
-              color: 'var(--text-color)', 
+              color: 'var(--text-primary)', 
               marginBottom: '8px',
               fontSize: '1.25rem',
               fontWeight: '600'
             }}>
-              ابتدا درس‌هایتان را انتخاب کنید
+              ابتدا گروه بسازید
             </h3>
             <p style={{ 
               color: 'var(--text-secondary)',
               fontSize: '0.95rem',
               lineHeight: '1.5'
             }}>
-              برای تنظیم اولویت‌ها و امتیازدهی، ابتدا از بخش انتخاب درس، درس‌های مورد نظرتان را انتخاب کنید.
+              برای تنظیم اولویت و امتیاز اساتید / زمان‌ها ابتدا گروه‌های انتخابی را در بخش «انتخاب درس‌ها» بسازید.
             </p>
           </div>
         </div>
@@ -276,13 +283,15 @@ const PreferencePanel: React.FC<PreferencePanelProps> = ({
 
   return (
     <div className="glass-card" style={{ 
-      margin: '16px 0', 
-      padding: '24px', 
-      borderRadius: '16px',
-      background: 'var(--glass-bg)',
-      backdropFilter: 'blur(10px)',
-      border: '1px solid var(--glass-border)',
-      animation: 'fadeInUp 0.3s ease'
+      margin: '12px 0', 
+      padding: '20px', 
+      borderRadius: '14px',
+      background: 'linear-gradient(155deg, rgba(0,0,0,0.72) 0%, rgba(15,20,28,0.58) 45%, rgba(25,32,42,0.34) 70%, rgba(40,52,66,0.08) 100%)',
+      backdropFilter: 'blur(22px) saturate(160%)',
+      WebkitBackdropFilter: 'blur(22px) saturate(160%)',
+      border: '1px solid rgba(255,255,255,0.07)',
+      boxShadow: '0 10px 38px -12px rgba(0,0,0,0.75)',
+      animation: 'fadeInUp 0.35s ease'
     }}>
       <div style={{ 
         display: 'flex', 
@@ -306,25 +315,27 @@ const PreferencePanel: React.FC<PreferencePanelProps> = ({
           </svg>
         </div>
         <h2 style={{ 
-          color: 'var(--text-color)', 
+          color: 'var(--text-primary)', 
           margin: 0, 
           fontSize: '1.5rem',
           fontWeight: '600'
         }}>
-          تنظیمات اولویت درس‌ها
+          اولویت و امتیازدهی گروه‌ها
         </h2>
       </div>
 
       <div className="help-text" style={{
-        marginBottom: '20px',
-        padding: '16px',
-        background: 'var(--info-bg)',
-        borderRadius: '12px',
-        fontSize: '0.9rem',
-        color: 'var(--text-secondary)',
+        marginBottom: '16px',
+        padding: '14px 16px',
+        background: 'rgba(255,255,255,0.04)',
+        borderRadius: '10px',
+        fontSize: '0.82rem',
+        lineHeight: '1.4',
+        color: 'rgba(220,225,235,0.8)',
         display: 'flex',
         alignItems: 'flex-start',
-        gap: '12px'
+        gap: '10px',
+        border: '1px solid rgba(255,255,255,0.06)'
       }}>
         <svg className="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <circle cx="12" cy="12" r="10"/>
@@ -332,20 +343,20 @@ const PreferencePanel: React.FC<PreferencePanelProps> = ({
           <path d="M12,17h0"/>
         </svg>
         <div>
-          <strong>راهنما:</strong> درس‌ها را با کشیدن مرتب کنید. درس بالاتر اولویت بیشتری دارد.
+          <strong>راهنما:</strong> گروه‌ها را با کشیدن مرتب کنید. گروه بالاتر اولویت بیشتری دارد.
           <br />
           ⭐ امتیاز 5: عالی | امتیاز 1: ضعیف
         </div>
       </div>
 
       <div className="preferences-list">
-        {preferences.map((pref, index) => {
-          const course = courses.find(c => c.courseCode === pref.courseCode);
-          if (!course) return null;
-
+        {groupPrefs.sort((a,b)=>a.priority-b.priority).map((gp, index) => {
+          // Build dynamic lists for display (professors/time slots) from groupPref state
+          const profEntries = Object.entries(gp.professorRatings);
+          const slotEntries = Object.entries(gp.timeSlotRatings);
           return (
             <div
-              key={pref.courseCode}
+              key={gp.groupId}
               draggable
               onDragStart={(e) => handleDragStart(e, index)}
               onDragOver={handleDragOver}
@@ -357,21 +368,21 @@ const PreferencePanel: React.FC<PreferencePanelProps> = ({
                 borderRadius: '12px',
                 cursor: 'move',
                 transition: 'all 0.3s ease',
-                background: draggedIndex === index ? 'var(--primary-bg-light)' : 'var(--glass-bg)',
-                border: '1px solid var(--glass-border)',
-                boxShadow: draggedIndex === index ? '0 8px 16px rgba(0,0,0,0.1)' : '0 2px 4px rgba(0,0,0,0.05)',
+                background: draggedIndex === index ? 'rgba(80,120,255,0.12)' : 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.06)',
+                boxShadow: draggedIndex === index ? '0 10px 22px -8px rgba(0,0,0,0.55)' : '0 2px 4px rgba(0,0,0,0.4)',
                 transform: draggedIndex === index ? 'scale(1.02)' : 'scale(1)'
               }}
               onMouseEnter={(e) => {
                 if (draggedIndex !== index) {
                   e.currentTarget.style.transform = 'scale(1.01)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.1)';
+                  e.currentTarget.style.boxShadow = '0 6px 14px -4px rgba(0,0,0,0.55)';
                 }
               }}
               onMouseLeave={(e) => {
                 if (draggedIndex !== index) {
                   e.currentTarget.style.transform = 'scale(1)';
-                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
+                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.4)';
                 }
               }}
             >
@@ -381,78 +392,82 @@ const PreferencePanel: React.FC<PreferencePanelProps> = ({
                 justifyContent: 'space-between' 
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div className="priority-badge glass" style={{
-                    padding: '8px 12px',
-                    borderRadius: '8px',
-                    background: 'var(--primary-gradient)',
-                    color: 'white',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    minWidth: '32px',
-                    textAlign: 'center'
+                  <div className="priority-badge" style={{
+                    padding: '6px 10px',
+                    borderRadius: '6px',
+                    background: 'linear-gradient(135deg,#3d6bff,#274088)',
+                    color: '#fff',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    letterSpacing: '.5px',
+                    minWidth: 30,
+                    textAlign: 'center',
+                    boxShadow: '0 2px 6px -2px rgba(0,0,0,0.6)'
                   }}>
-                    {pref.priority}
+                    {gp.priority}
                   </div>
                   <div>
                     <h3 style={{ 
                       margin: 0, 
-                      fontSize: '1.1rem',
-                      fontWeight: '600', 
-                      color: 'var(--text-color)' 
+                      fontSize: '1rem',
+                      fontWeight: 600, 
+                      color: 'var(--text-primary)'
                     }}>
-                      {pref.courseName}
+                      {gp.groupName}
                     </h3>
                     <p style={{ 
                       margin: '4px 0 0 0', 
-                      fontSize: '0.85rem',
-                      color: 'var(--text-secondary)' 
+                      fontSize: '0.7rem',
+                      letterSpacing: '.3px',
+                      color: 'var(--text-secondary)'
                     }}>
-                      {course.units} واحد
+                      {profEntries.length} استاد • {slotEntries.length} بازه زمانی
                     </p>
                   </div>
                 </div>
                 <button
-                  onClick={() => setExpandedCourse(
-                    expandedCourse === pref.courseCode ? null : pref.courseCode
+                  onClick={() => setExpandedGroup(
+                    expandedGroup === gp.groupId ? null : gp.groupId
                   )}
-                  className="btn-modern btn-secondary"
+                  className="btn-modern"
                   style={{
-                    padding: '8px 12px',
-                    borderRadius: '8px',
-                    fontSize: '14px',
+                    padding: '6px 10px',
+                    borderRadius: '6px',
+                    fontSize: '12px',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '4px'
                   }}
                 >
                   <svg className="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    {expandedCourse === pref.courseCode ? (
+                    {expandedGroup === gp.groupId ? (
                       <path d="M18 15l-6-6-6 6"/>
                     ) : (
                       <path d="M6 9l6 6 6-6"/>
                     )}
                   </svg>
-                  {expandedCourse === pref.courseCode ? 'بستن' : 'تنظیمات'}
+                  {expandedGroup === gp.groupId ? 'بستن' : 'تنظیمات'}
                 </button>
               </div>
 
-              {expandedCourse === pref.courseCode && (
+              {expandedGroup === gp.groupId && (
                 <div className="expanded-content" style={{ 
-                  marginTop: '20px', 
-                  paddingTop: '20px', 
-                  borderTop: '1px solid var(--glass-border)',
+                  marginTop: 16, 
+                  paddingTop: 16, 
+                  borderTop: '1px solid rgba(255,255,255,0.06)',
                   animation: 'slideInLeft 0.3s ease'
                 }}>
                   {/* Professor Ratings */}
                   <div style={{ marginBottom: '20px' }}>
                     <h4 className="section-title" style={{ 
-                      fontSize: '1rem', 
-                      fontWeight: '600', 
-                      marginBottom: '12px', 
-                      color: 'var(--text-color)',
+                      fontSize: '.85rem', 
+                      fontWeight: 600, 
+                      marginBottom: '10px', 
+                      color: 'rgba(230,235,245,0.9)',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '8px'
+                      gap: '6px',
+                      letterSpacing: '.3px'
                     }}>
                       <svg className="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
@@ -460,27 +475,29 @@ const PreferencePanel: React.FC<PreferencePanelProps> = ({
                       </svg>
                       امتیاز اساتید:
                     </h4>
-                    {course.sections.map(section => (
-                      <div key={section.sectionCode} className="rating-item glass" style={{ 
+                    {profEntries.map(([profName]) => (
+                      <div key={profName} className="rating-item" style={{ 
                         display: 'flex', 
                         alignItems: 'center', 
                         justifyContent: 'space-between',
-                        marginBottom: '10px',
-                        padding: '12px',
-                        background: 'var(--secondary-bg)',
-                        borderRadius: '8px',
-                        border: '1px solid var(--glass-border)'
+                        marginBottom: 8,
+                        padding: '10px 12px',
+                        background: 'rgba(255,255,255,0.05)',
+                        borderRadius: '6px',
+                        border: '1px solid rgba(255,255,255,0.06)',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.4)'
                       }}>
                         <span style={{ 
-                          fontSize: '14px', 
-                          color: 'var(--text-color)',
-                          fontWeight: '500'
+                          fontSize: '12px', 
+                          color: 'rgba(240,245,255,0.9)',
+                          fontWeight: 500,
+                          letterSpacing: '.2px'
                         }}>
-                          {section.professor.name}
+                          {profName}
                         </span>
                         <StarRating
-                          rating={pref.professorRatings[section.professor.name] || 3}
-                          onChange={(rating) => updateProfessorRating(pref.courseCode, section.professor.name, rating)}
+                          rating={gp.professorRatings[profName] || 3}
+                          onChange={(rating) => updateProfessorRating(gp.groupId, profName, rating)}
                           size="16px"
                         />
                       </div>
@@ -490,13 +507,14 @@ const PreferencePanel: React.FC<PreferencePanelProps> = ({
                   {/* Time Slot Ratings */}
                   <div>
                     <h4 className="section-title" style={{ 
-                      fontSize: '1rem', 
-                      fontWeight: '600', 
-                      marginBottom: '12px', 
-                      color: 'var(--text-color)',
+                      fontSize: '.85rem', 
+                      fontWeight: 600, 
+                      marginBottom: '10px', 
+                      color: 'rgba(230,235,245,0.9)',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '8px'
+                      gap: '6px',
+                      letterSpacing: '.3px'
                     }}>
                       <svg className="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <circle cx="12" cy="12" r="10"/>
@@ -504,36 +522,33 @@ const PreferencePanel: React.FC<PreferencePanelProps> = ({
                       </svg>
                       امتیاز زمان‌بندی:
                     </h4>
-                    {course.sections.map(section => 
-                      section.schedule.map(slot => {
-                        const slotKey = `${slot.day}-${slot.start}-${slot.end}`;
-                        return (
-                          <div key={slotKey} className="rating-item glass" style={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            justifyContent: 'space-between',
-                            marginBottom: '10px',
-                            padding: '12px',
-                            background: 'var(--success-bg)',
-                            borderRadius: '8px',
-                            border: '1px solid var(--glass-border)'
-                          }}>
-                            <span style={{ 
-                              fontSize: '14px', 
-                              color: 'var(--text-color)',
-                              fontWeight: '500'
-                            }}>
-                              {formatTimeSlot(slotKey)}
-                            </span>
-                            <StarRating
-                              rating={pref.timeSlotRatings[slotKey] || 3}
-                              onChange={(rating) => updateTimeSlotRating(pref.courseCode, slotKey, rating)}
-                              size="16px"
-                            />
-                          </div>
-                        );
-                      })
-                    )}
+                    {slotEntries.map(([slotKey]) => (
+                      <div key={slotKey} className="rating-item" style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between',
+                        marginBottom: 8,
+                        padding: '10px 12px',
+                        background: 'rgba(255,255,255,0.05)',
+                        borderRadius: '6px',
+                        border: '1px solid rgba(255,255,255,0.06)',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.4)'
+                      }}>
+                        <span style={{ 
+                          fontSize: '12px', 
+                          color: 'rgba(240,245,255,0.9)',
+                          fontWeight: 500,
+                          letterSpacing: '.2px'
+                        }}>
+                          {formatTimeSlot(slotKey)}
+                        </span>
+                        <StarRating
+                          rating={gp.timeSlotRatings[slotKey] || 3}
+                          onChange={(rating) => updateTimeSlotRating(gp.groupId, slotKey, rating)}
+                          size="16px"
+                        />
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}

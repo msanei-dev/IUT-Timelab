@@ -13,6 +13,9 @@ const createWindow = (): void => {
   const mainWindow = new BrowserWindow({
     height: 800,
     width: 1200,
+    frame: false, // custom chrome
+    titleBarStyle: 'hiddenInset',
+    trafficLightPosition: { x: 14, y: 14 } as any, // macOS only safe-guard
     webPreferences: {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
       nodeIntegration: false,
@@ -21,6 +24,8 @@ const createWindow = (): void => {
   });
 
   mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
+  // Expose id for later reference if needed
+  (global as any).__MAIN_WINDOW_ID__ = mainWindow.id;
 };
 
 app.on('ready', createWindow);
@@ -146,6 +151,27 @@ ipcMain.handle('process-excel-data', async (_event, fileBuffer: number[]) => {
       message: `خطا در پردازش فایل اکسل: ${error.message}` 
     };
   }
+});
+
+// Window control channels
+ipcMain.on('win:minimize', (e) => {
+  const win = BrowserWindow.fromWebContents(e.sender);
+  if (win) win.minimize();
+});
+ipcMain.on('win:toggle-max', (e) => {
+  const win = BrowserWindow.fromWebContents(e.sender);
+  if (win) {
+    if (win.isMaximized()) win.unmaximize(); else win.maximize();
+    e.sender.send('win:is-maximized', win.isMaximized());
+  }
+});
+ipcMain.on('win:close', (e) => {
+  const win = BrowserWindow.fromWebContents(e.sender);
+  if (win) win.close();
+});
+ipcMain.handle('win:get-max', (e) => {
+  const win = BrowserWindow.fromWebContents(e.sender);
+  return win ? win.isMaximized() : false;
 });
 
 // Quit when all windows are closed, except on macOS. There, it's common
