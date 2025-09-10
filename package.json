@@ -1,8 +1,8 @@
 {
-  "name": "smart-scheduler",
-  "productName": "smart-scheduler",
+  "name": "iut-timelab",
+  "productName": "IUT Timelab",
   "version": "1.0.0",
-  "description": "My Electron application description",
+  "description": "IUT Timelab - Intelligent Course Scheduler for Isfahan University of Technology",
   "main": ".webpack/main",
   "scripts": {
     "start": "electron-forge start && node copy-data.js",
@@ -11,12 +11,28 @@
     "publish": "electron-forge publish",
     "lint": "eslint --ext .ts,.tsx ."
   },
-  "keywords": [],
+  "keywords": [
+    "IUT",
+    "scheduler",
+    "university",
+    "courses",
+    "electron",
+    "react",
+    "timetable"
+  ],
   "author": {
     "name": "Matin-senior",
     "email": "saneiamtin33@example.com"
   },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/msanei_dev/iut-timelab.git"
+  },
+  "bugs": {
+    "url": "https://github.com/msanei_dev/iut-timelab/issues"
+  },
+  "homepage": "https://github.com/msanei_dev/iut-timelab#readme",
   "devDependencies": {
     "@electron-forge/cli": "^7.8.3",
     "@electron-forge/maker-deb": "^7.8.3",
@@ -58,7 +74,7 @@
         {
           "name": "@electron-forge/maker-squirrel",
           "config": {
-            "name": "smart-scheduler"
+            "name": "iut-timelab"
           }
         },
         {
