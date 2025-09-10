@@ -2,6 +2,7 @@
 import fs from 'fs';
 import path from 'path';
 import { DataFile, Course, Section, ScheduleSection, TimeSlot, Day } from './shared/types';
+import { timeToMinutes } from './utils/time';
 import { GroupingConfig, generateSelectionScenarios, buildGroupIndex, generateOptionalScenarios } from './grouping';
 
 // Load data.json
@@ -16,11 +17,6 @@ function timeOverlap(a: TimeSlot, b: TimeSlot): boolean {
   if (a.day !== b.day) return false;
   
   // تبدیل زمان به دقیقه برای مقایسه آسان‌تر
-  const timeToMinutes = (time: string): number => {
-    const [hours, minutes] = time.split(':').map(Number);
-    return hours * 60 + minutes;
-  };
-  
   const aStart = timeToMinutes(a.start);
   const aEnd = timeToMinutes(a.end);
   const bStart = timeToMinutes(b.start);
