@@ -23,7 +23,7 @@ import TitleBar from './components/TitleBar';
 const api = (window as any).api;
 
 // Toggle to show/hide the course data add/import controls globally
-const SHOW_COURSE_DATA_IMPORT = false; // set to false to hide DataInput and Excel import button
+const SHOW_COURSE_DATA_IMPORT = true; // set to false to hide DataInput and Excel import button
 
 const App: React.FC = () => {
   const { courseNames, courses, courseNameMapping, reload } = useCourseData();
@@ -37,6 +37,8 @@ const App: React.FC = () => {
   const [showCourseBrowser, setShowCourseBrowser] = useState(false);
   const { schedules, currentIdx, setCurrentIdx, loading, groupingConfig, setGroupingConfig, options, setOptions, generate } = useScheduling({ groups: [] });
   const [preferences, setPreferences] = useState<any[]>([]);
+  // Faculty filter (prefix-based) should be available before syncing effect uses it
+  const [selectedFaculty, setSelectedFaculty] = useState<string | null>(null);
   // همگام سازی بین GroupManager (groupingConfig) و مدل جدید CourseGroup
   useEffect(()=>{
     if (!courses) return;
@@ -45,7 +47,15 @@ const App: React.FC = () => {
     for (const g of courseGroups) prevMap[g.id] = g;
     const derived: CourseGroup[] = legacy.map((g, idx) => {
       const codes: string[] = [];
-      courses.forEach(c => { if (g.courseNames.includes(c.courseName)) codes.push(c.courseCode); });
+      courses.forEach(c => {
+        // Only include course codes for selected faculty (by prefix) when a faculty is chosen
+        const inSelectedFaculty = !selectedFaculty || (c.courseCode && c.courseCode.toString().startsWith(selectedFaculty));
+        // Only include courses that have at least one section (selectable)
+        const hasSections = Array.isArray(c.sections) && c.sections.length > 0;
+        if (inSelectedFaculty && hasSections && g.courseNames.includes(c.courseName)) {
+          codes.push(c.courseCode);
+        }
+      });
       const prev = prevMap[g.id];
       return {
         id: g.id,
@@ -56,7 +66,7 @@ const App: React.FC = () => {
       };
     });
     setCourseGroups(derived);
-  }, [groupingConfig, courses]);
+  }, [groupingConfig, courses, selectedFaculty]);
 
   // ---------- Settings Persistence (IPC) ----------
   // ساخت UserPreferences از آرایه preferences موجود (الگوی ساده استخراج)
@@ -151,7 +161,6 @@ const App: React.FC = () => {
   // Grouping configuration state
   // groupingConfig managed by scheduling hook
   const [showGroups, setShowGroups] = useState(false); // overlay modal
-  const [selectedFaculty, setSelectedFaculty] = useState<string | null>(null); // prefix-based faculty selection
   const [minUnits, setMinUnits] = useState<number | ''>('');
   const [maxUnits, setMaxUnits] = useState<number | ''>('');
   const [allowSkipping, setAllowSkipping] = useState<boolean>(true);
@@ -168,8 +177,13 @@ const App: React.FC = () => {
   const generateGASchedules = async () => {
     if (!courses || !courses.length) { alert('ابتدا داده دروس را وارد کنید'); return; }
   if (!courseGroups.length) { alert('ابتدا گروه درسی بسازید'); return; }
-  const activeGroups = courseGroups.filter(g => g.isActive);
-  if (!activeGroups.length) { alert('هیچ گروه فعالی برای محاسبه وجود ندارد (همه Off هستند).'); return; }
+  const activeGroupsRaw = courseGroups.filter(g => g.isActive);
+  if (!activeGroupsRaw.length) { alert('هیچ گروه فعالی برای محاسبه وجود ندارد (همه Off هستند).'); return; }
+  const activeGroups = activeGroupsRaw.filter(g => g.courseCodes && g.courseCodes.length > 0);
+  if (!activeGroups.length) {
+    alert('هیچ گزینه‌ای برای انتخاب در گروه‌های فعال یافت نشد. لطفاً در "مدیریت گروه‌ها" مطمئن شوید هر گروه فعال حداقل یک درس دارای سکشن دارد.');
+    return;
+  }
     setCurrentIdx(0);
     try {
       // Basic params can be tuned later / maybe add UI controls
@@ -685,6 +699,7 @@ const App: React.FC = () => {
               onPreferencesChange={setPreferences}
               weights={prefWeights}
               onWeightsChange={setPrefWeights}
+              selectedFaculty={selectedFaculty}
               onGroupOrderChange={(orderedIds)=>{
                 // Map ordered IDs to new priorities: first -> High, next two -> Medium, rest -> Low (保持 منطق قبلی تقریبی)
                 setCourseGroups(prev => {
@@ -702,7 +717,37 @@ const App: React.FC = () => {
           </div>
         ) : (
           <div className="card" style={{ padding: '16px' }}>
-            <CourseDetails courses={courses} />
+            {(() => {
+              // 1) کدهای گروه‌های فعال (همان منبع اصلی محدودیت‌ها)
+              const activeGroupCodes = Array.from(new Set(
+                courseGroups
+                  .filter(g=>g.isActive)
+                  .flatMap(g=>g.courseCodes)
+                  .filter(code => (courses||[]).some(c=>c.courseCode===code && c.sections && c.sections.length>0))
+                  .map(c=>String(c))
+              ));
+
+              // 2) کد درس‌های انتخاب‌شده (CourseSelector) بر اساس ۷ رقم اول نمایش
+              const selectedCourseCodes = Array.from(new Set(
+                selected.map(dn => {
+                  const m = dn.match(/^(\d{7})/); return m? m[1] : null;
+                }).filter(Boolean) as string[]
+              ));
+
+              // 3) منطق انتخاب نهایی:
+              // اگر کاربر درس انتخاب کرده باشد → اشتراک انتخاب‌ها با گروه‌های فعال (برای جلوگیری از نمایش درس خارج از گروه‌ها)
+              // اگر اشتراک خالی شد ولی کاربر انتخاب داشته → خود انتخاب‌ها (تا کاربر پیام خالی نبیند)
+              // اگر هیچ انتخابی نباشد → همه کدهای گروه‌های فعال
+              let effective: string[] = [];
+              if (selectedCourseCodes.length) {
+                const intersection = selectedCourseCodes.filter(code => activeGroupCodes.includes(code));
+                effective = intersection.length ? intersection : selectedCourseCodes; 
+              } else {
+                effective = activeGroupCodes;
+              }
+
+              return <CourseDetails courses={courses} activeCourseCodes={effective} />;
+            })()}
           </div>
         )}
       </div>

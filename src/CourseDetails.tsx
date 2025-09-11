@@ -2,10 +2,14 @@ import React from 'react';
 
 interface Props {
   courses: any;
+  // Optional: if provided, only show courses whose courseCode is in this list (active groups)
+  activeCourseCodes?: string[];
 }
 
-const CourseDetails: React.FC<Props> = ({ courses }) => {
-  if (!courses || !courses.courses) return null;
+const CourseDetails: React.FC<Props> = ({ courses, activeCourseCodes }) => {
+  // قبلاً اگر courses به صورت آرایه (فرمت هوک useCourseData) بود به خاطر نبودن courses.courses مقدار null برمی‌گشت و هیچ چیزی نمایش داده نمی‌شد.
+  // این گارد را اصلاح می‌کنیم تا هم آرایه و هم آبجکت { courses: [...] } را پشتیبانی کند.
+  if (!courses) return null;
 
   const formatSchedule = (schedule: any[]) => {
     if (!schedule || schedule.length === 0) return 'زمان‌بندی نامشخص';
@@ -24,6 +28,18 @@ const CourseDetails: React.FC<Props> = ({ courses }) => {
       return `${dayNames[slot.day] || slot.day} ${slot.start}-${slot.end}`;
     }).join(', ');
   };
+
+  // Filter by active groups if activeCourseCodes provided
+  const courseList = Array.isArray(courses) ? courses : courses.courses;
+
+  const activeProvided = typeof activeCourseCodes !== 'undefined';
+  const activeSet = new Set(
+    (activeCourseCodes || []).map(c => c != null ? String(c) : '')
+  );
+
+  const filtered = activeProvided
+    ? (activeSet.size === 0 ? [] : courseList.filter((c: any) => activeSet.has(String(c.courseCode))))
+    : courseList;
 
   return (
     <div style={{
@@ -48,7 +64,12 @@ const CourseDetails: React.FC<Props> = ({ courses }) => {
         overflowY: 'auto',
         fontSize: '13px'
       }}>
-        {courses.courses.map((course: any, idx: number) => (
+  {activeProvided && activeSet.size===0 && (
+        <div style={{ fontSize:'12px', color:'var(--text-secondary)', textAlign:'center', padding:'12px' }}>
+          هیچ درسی انتخاب نشده است.
+        </div>
+      )}
+      {filtered.map((course: any, idx: number) => (
           <div key={idx} style={{
             marginBottom: '16px',
             padding: '12px',
@@ -79,6 +100,11 @@ const CourseDetails: React.FC<Props> = ({ courses }) => {
                 <div style={{ color: 'var(--text-muted)', marginTop: '4px' }}>
                   {formatSchedule(section.schedule)}
                 </div>
+                {section.notes && (
+                  <div style={{ color: 'var(--text-primary)', marginTop: '6px', background:'rgba(255,255,255,0.06)', padding:'6px 8px', borderRadius:6 }}>
+                    {section.notes}
+                  </div>
+                )}
               </div>
             ))}
           </div>

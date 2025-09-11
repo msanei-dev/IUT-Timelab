@@ -1,6 +1,7 @@
 // Backtracking solver and scoring engine for Smart University Course Scheduler
 import fs from 'fs';
 import path from 'path';
+import { app } from 'electron';
 import { DataFile, Course, Section, ScheduleSection, TimeSlot, Day } from './shared/types';
 import { GroupingConfig, generateSelectionScenarios, buildGroupIndex, generateOptionalScenarios } from './grouping';
 import { calculateScore } from './solver/scoring';
@@ -8,8 +9,19 @@ import { analyzeConflicts } from './solver/conflicts';
 
 // Load data.json
 export function loadData(): DataFile {
-  const dataPath = path.join(__dirname, 'data.json');
-  const raw = fs.readFileSync(dataPath, 'utf-8');
+  // ابتدا اگر فایل کاربر وجود دارد از آن بخوان
+  try {
+    const userDataPath = path.join(app.getPath('userData'), 'data.json');
+    if (fs.existsSync(userDataPath)) {
+      const rawUser = fs.readFileSync(userDataPath, 'utf-8');
+      return JSON.parse(rawUser);
+    }
+  } catch (e) {
+    // اگر در محیط dev app در دسترس نباشد، نادیده بگیر
+  }
+  // در غیر این صورت از فایل پیش‌فرض کنار باندل استفاده کن
+  const bundledPath = path.join(__dirname, 'data.json');
+  const raw = fs.readFileSync(bundledPath, 'utf-8');
   return JSON.parse(raw);
 }
 
