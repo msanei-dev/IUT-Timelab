@@ -141,5 +141,153 @@
         }
       ]
     }
+    ,
+    {
+      "courseName": "استاتيك",
+      "courseCode": "1512153",
+      "units": 3,
+      "sections": [
+        {
+          "sectionCode": "01",
+          "professor": {
+            "name": "نوري فعله كري نيما",
+            "takesAttendance": false,
+            "teachingQuality": "average"
+          },
+          "schedule": [
+            { "day": "Sunday",  "start": "15:00", "end": "16:30" },
+            { "day": "Tuesday", "start": "15:00", "end": "16:30" }
+          ]
+        }
+      ]
+    }
+    ,
+    {
+      "courseName": "معادلات ديفرانسيل",
+      "courseCode": "1914251",
+      "units": 3,
+      "sections": [
+        {
+          "sectionCode": "01",
+          "professor": {
+            "name": "ودادي محمد رضا",
+            "takesAttendance": false,
+            "teachingQuality": "average"
+          },
+          "schedule": [
+            { "day": "Saturday", "start": "13:00", "end": "15:00" },
+            { "day": "Monday",   "start": "13:00", "end": "15:00" }
+          ]
+        },
+        {
+          "sectionCode": "02",
+          "professor": {
+            "name": "عسكري شادي",
+            "takesAttendance": false,
+            "teachingQuality": "average"
+          },
+          "schedule": [
+            { "day": "Saturday", "start": "15:00", "end": "16:30" },
+            { "day": "Saturday", "start": "16:30", "end": "17:00" },
+            { "day": "Monday",   "start": "15:00", "end": "16:30" },
+            { "day": "Monday",   "start": "16:30", "end": "17:00" }
+          ]
+        },
+        {
+          "sectionCode": "03",
+          "professor": {
+            "name": "مزروعي سبداني رضا",
+            "takesAttendance": false,
+            "teachingQuality": "average"
+          },
+          "schedule": [
+            { "day": "Sunday",  "start": "13:00", "end": "15:00" },
+            { "day": "Tuesday", "start": "13:00", "end": "15:00" }
+          ]
+        },
+        {
+          "sectionCode": "04",
+          "professor": {
+            "name": "لكزيان سجاد",
+            "takesAttendance": false,
+            "teachingQuality": "average"
+          },
+          "schedule": [
+            { "day": "Sunday",  "start": "15:00", "end": "16:30" },
+            { "day": "Sunday",  "start": "16:30", "end": "17:00" },
+            { "day": "Tuesday", "start": "15:00", "end": "16:30" },
+            { "day": "Tuesday", "start": "16:30", "end": "17:00" }
+          ]
+        },
+        {
+          "sectionCode": "05",
+          "professor": {
+            "name": "عاشقي حسين آبادي رسول",
+            "takesAttendance": false,
+            "teachingQuality": "average"
+          },
+          "schedule": [
+            { "day": "Sunday",  "start": "13:00", "end": "15:00" },
+            { "day": "Tuesday", "start": "13:00", "end": "15:00" }
+          ]
+        }
+      ]
+    }
+    ,
+    {
+      "courseName": "علم مواد",
+      "courseCode": "1510205",
+      "units": 3,
+      "sections": [
+        {
+          "sectionCode": "01",
+          "professor": {
+            "name": "مالكي علي",
+            "takesAttendance": false,
+            "teachingQuality": "average"
+          },
+          "schedule": [
+            { "day": "Saturday", "start": "08:00", "end": "09:30" },
+            { "day": "Monday",   "start": "08:00", "end": "09:30" }
+          ]
+        },
+        {
+          "sectionCode": "02",
+          "professor": {
+            "name": "كرباسي مريم",
+            "takesAttendance": false,
+            "teachingQuality": "average"
+          },
+          "schedule": [
+            { "day": "Sunday",  "start": "08:00", "end": "09:30" },
+            { "day": "Tuesday", "start": "08:00", "end": "09:30" }
+          ]
+        },
+        {
+          "sectionCode": "03",
+          "professor": {
+            "name": "اشرفي علي",
+            "takesAttendance": false,
+            "teachingQuality": "average"
+          },
+          "schedule": [
+            { "day": "Sunday",  "start": "11:00", "end": "12:30" },
+            { "day": "Tuesday", "start": "11:00", "end": "12:30" }
+          ]
+        },
+        {
+          "sectionCode": "04",
+          "professor": {
+            "name": "عظيمي روئين قاسم",
+            "takesAttendance": false,
+            "teachingQuality": "average"
+          },
+          "schedule": [
+            { "day": "Monday",    "start": "08:00", "end": "09:30" },
+            { "day": "Wednesday", "start": "08:00", "end": "09:30" }
+          ]
+        }
+      ]
+    }
   ]
 }
