@@ -123,13 +123,58 @@ const GroupManager: React.FC<Props> = ({ allCourseNames, value, onChange }) => {
                   <span style={{ lineHeight:1.2, color:'var(--text-primary)' }}>{g.name}</span>
                   <span style={{ color:'var(--text-secondary)', fontWeight:400, fontSize:'0.65rem' }}>{g.courseNames.length} درس</span>
                 </div>
-                <div style={{ display:'flex', gap:4 }}>
+                <div style={{ display:'flex', gap:8, alignItems:'center' }}>
                   <button
-                    onClick={e => { e.stopPropagation(); persist(groups.map(gr => gr.id===g.id ? { ...gr, // @ts-ignore legacy shape accept
-                      isActive: (gr as any).isActive === false ? true : !(gr as any).isActive } : gr)); }}
-                    style={{ background:'none', border:'none', cursor:'pointer', fontSize:'0.65rem', color:(g as any).isActive===false ? '#dc2626' : 'var(--primary-color)' }}
-                    title={(g as any).isActive===false ? 'فعال سازی گروه' : 'غیرفعال کردن گروه'}
-                  >{(g as any).isActive===false ? 'Off' : 'On'}</button>
+                    onClick={e => { 
+                      e.stopPropagation(); 
+                      persist(groups.map(gr => gr.id===g.id ? { 
+                        ...gr, // @ts-ignore legacy shape accept
+                        isActive: (gr as any).isActive === false ? true : !(gr as any).isActive 
+                      } : gr)); 
+                    }}
+                    aria-pressed={(g as any).isActive!==false}
+                    title={(g as any).isActive===false ? 'فعال‌سازی گروه' : 'غیرفعال کردن گروه'}
+                    style={{ 
+                      background:'transparent', 
+                      border:'none', 
+                      cursor:'pointer', 
+                      padding:0,
+                      display:'inline-flex',
+                      alignItems:'center',
+                      gap:6
+                    }}
+                  >
+                    <span style={{ 
+                      fontSize:'0.7rem', 
+                      fontWeight:700,
+                      color: (g as any).isActive===false ? '#f87171' : '#10b981' 
+                    }}>
+                      {(g as any).isActive===false ? 'خاموش' : 'روشن'}
+                    </span>
+                    <span 
+                      aria-hidden
+                      style={{ 
+                        width: 38, 
+                        height: 20, 
+                        borderRadius: 999, 
+                        background: (g as any).isActive===false ? '#374151' : 'linear-gradient(90deg,#2563eb,#1d4ed8)',
+                        position:'relative',
+                        boxShadow:'inset 0 0 0 1px rgba(255,255,255,0.12)'
+                      }}
+                    >
+                      <span style={{
+                        position:'absolute',
+                        top: 2,
+                        left: (g as any).isActive===false ? 2 : 20,
+                        width: 16,
+                        height: 16,
+                        borderRadius: 999,
+                        background:'#fff',
+                        boxShadow:'0 1px 2px rgba(0,0,0,0.35)',
+                        transition:'left 160ms ease'
+                      }}/>
+                    </span>
+                  </button>
                   <button
                     onClick={e => { e.stopPropagation(); removeGroup(g.id); }}
                     style={{ background:'none', border:'none', cursor:'pointer', color:'#dc2626', fontSize:'0.9rem', lineHeight:1 }}
