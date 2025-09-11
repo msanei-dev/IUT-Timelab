@@ -59,11 +59,11 @@ ipcMain.handle('get-ranked-schedules', async (_event, desiredCourseNames: string
 ipcMain.handle('save-data', async (_event, newData: any) => {
   try {
     // ذخیره‌سازی داده‌های جدید
-  const fs = require('fs');
-  const path = require('path');
+    const fs = require('fs');
+    const path = require('path');
     
-  // مسیر فایل data.json در پوشه‌ی کاربر برای پایداری و دسترسی نوشتن
-  const dataPath = path.join(app.getPath('userData'), 'data.json');
+    // مسیر فایل data.json
+    const dataPath = path.join(__dirname, 'data.json');
     
     // اگر داده‌های جدید خالی باشه، فایل رو پاک کن
     if (!newData.courses || newData.courses.length === 0) {
@@ -131,9 +131,9 @@ ipcMain.handle('process-excel-data', async (_event, fileBuffer: number[]) => {
     const courses = parseExcelToCourses(buffer);
     
     // ذخیره در فایل data.json
-  const fs = require('fs');
-  const path = require('path');
-  const dataPath = path.join(app.getPath('userData'), 'data.json');
+    const fs = require('fs');
+    const path = require('path');
+    const dataPath = path.join(__dirname, 'data.json');
     const dataToSave = { courses: courses };
     
     fs.writeFileSync(dataPath, JSON.stringify(dataToSave, null, 2), 'utf-8');

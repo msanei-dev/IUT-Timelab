@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Crown, SlidersHorizontal } from 'lucide-react';
 import { CourseGroup, PreferenceWeights } from './shared/types';
 
 interface Professor {
@@ -290,58 +291,55 @@ const PreferencePanel: React.FC<PreferencePanelProps> = ({
 
   return (
     <div className="glass-card" style={{ 
-      margin: '12px 0', 
-      padding: '20px', 
-      borderRadius: '14px',
-      background: 'linear-gradient(155deg, rgba(0,0,0,0.72) 0%, rgba(15,20,28,0.58) 45%, rgba(25,32,42,0.34) 70%, rgba(40,52,66,0.08) 100%)',
-      backdropFilter: 'blur(22px) saturate(160%)',
-      WebkitBackdropFilter: 'blur(22px) saturate(160%)',
-      border: '1px solid rgba(255,255,255,0.07)',
-      boxShadow: '0 10px 38px -12px rgba(0,0,0,0.75)',
+      margin: '8px 0', 
+      padding: '14px', 
+      borderRadius: '8px',
+      background: 'linear-gradient(145deg, rgba(17,24,39,0.6) 0%, rgba(17,24,39,0.35) 100%)',
+      backdropFilter: 'blur(12px) saturate(140%)',
+      WebkitBackdropFilter: 'blur(12px) saturate(140%)',
+      border: '1px solid rgba(255,255,255,0.06)',
+      boxShadow: '0 6px 20px -12px rgba(0,0,0,0.6)',
       animation: 'fadeInUp 0.35s ease'
     }}>
       <div style={{ 
         display: 'flex', 
         alignItems: 'center', 
-        gap: '12px', 
-        marginBottom: '24px' 
+        gap: '10px', 
+        marginBottom: '14px' 
       }}>
         <div className="glass" style={{
           padding: '8px',
-          borderRadius: '8px',
+          borderRadius: '10px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: 'var(--primary-gradient)'
+          background: 'var(--primary-gradient)',
+          boxShadow: '0 8px 26px -12px rgba(37,99,235,0.5)',
+          border: '1px solid rgba(255,255,255,0.15)'
         }}>
-          <svg className="icon text-white" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M3 6h18l-2 13H5L3 6z"/>
-            <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-            <line x1="10" y1="11" x2="10" y2="17"/>
-            <line x1="14" y1="11" x2="14" y2="17"/>
-          </svg>
+          <Crown size={18} color="#fff" strokeWidth={2.2} />
         </div>
         <h2 style={{ 
           color: 'var(--text-primary)', 
           margin: 0, 
-          fontSize: '1.5rem',
-          fontWeight: '600'
+          fontSize: '1.1rem',
+          fontWeight: 700
         }}>
           اولویت و امتیازدهی گروه‌ها
         </h2>
       </div>
 
   <div className="help-text" style={{
-        marginBottom: '16px',
-        padding: '14px 16px',
+        marginBottom: '12px',
+        padding: '10px 12px',
         background: 'rgba(255,255,255,0.04)',
-        borderRadius: '10px',
-        fontSize: '0.82rem',
+        borderRadius: '6px',
+        fontSize: '0.78rem',
         lineHeight: '1.4',
         color: 'rgba(220,225,235,0.8)',
         display: 'flex',
         alignItems: 'flex-start',
-        gap: '10px',
+        gap: '8px',
         border: '1px solid rgba(255,255,255,0.06)'
       }}>
         <svg className="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -360,12 +358,12 @@ const PreferencePanel: React.FC<PreferencePanelProps> = ({
       <div style={{
         display:'grid',
         gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',
-        gap:'16px',
-        marginBottom:'24px',
+        gap:'12px',
+        marginBottom:'16px',
         background:'rgba(255,255,255,0.04)',
-        padding:'16px 18px 10px',
+        padding:'12px 14px 8px',
         border:'1px solid rgba(255,255,255,0.06)',
-        borderRadius:'12px'
+        borderRadius:'8px'
       }}>
         {([
           { key:'professor', label:'اهمیت استاد' },
@@ -374,9 +372,9 @@ const PreferencePanel: React.FC<PreferencePanelProps> = ({
           { key:'compactness', label:'فشردگی برنامه' }
         ] as {key:keyof PreferenceWeights; label:string;}[]).map(item => (
           <div key={item.key} style={{ display:'flex', flexDirection:'column', gap:6 }}>
-            <label style={{ fontSize:'0.7rem', fontWeight:600, color:'var(--text-secondary)', display:'flex', justifyContent:'space-between' }}>
+            <label style={{ fontSize:'0.68rem', fontWeight:600, color:'var(--text-secondary)', display:'flex', justifyContent:'space-between' }}>
               <span>{item.label}</span>
-              <span style={{ fontSize:'0.65rem', color:'var(--text-primary)' }}>{weights[item.key]}</span>
+              <span style={{ fontSize:'0.62rem', color:'var(--text-primary)' }}>{weights[item.key]}</span>
             </label>
             <input
               type="range"
@@ -404,14 +402,14 @@ const PreferencePanel: React.FC<PreferencePanelProps> = ({
               onDrop={(e) => handleDrop(e, index)}
               className="preference-item glass"
               style={{
-                padding: '16px',
-                marginBottom: '12px',
-                borderRadius: '12px',
+                padding: '12px',
+                marginBottom: '10px',
+                borderRadius: '8px',
                 cursor: 'move',
                 transition: 'all 0.3s ease',
-                background: draggedIndex === index ? 'rgba(80,120,255,0.12)' : 'rgba(255,255,255,0.04)',
+                background: draggedIndex === index ? 'rgba(80,120,255,0.10)' : 'rgba(255,255,255,0.035)',
                 border: '1px solid rgba(255,255,255,0.06)',
-                boxShadow: draggedIndex === index ? '0 10px 22px -8px rgba(0,0,0,0.55)' : '0 2px 4px rgba(0,0,0,0.4)',
+                boxShadow: draggedIndex === index ? '0 8px 16px -10px rgba(0,0,0,0.55)' : '0 1px 2px rgba(0,0,0,0.35)',
                 transform: draggedIndex === index ? 'scale(1.02)' : 'scale(1)'
               }}
               onMouseEnter={(e) => {
@@ -432,33 +430,33 @@ const PreferencePanel: React.FC<PreferencePanelProps> = ({
                 alignItems: 'center', 
                 justifyContent: 'space-between' 
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <div className="priority-badge" style={{
-                    padding: '6px 10px',
+                    padding: '4px 8px',
                     borderRadius: '6px',
                     background: 'linear-gradient(135deg,#3d6bff,#274088)',
                     color: '#fff',
-                    fontSize: '12px',
+                    fontSize: '11px',
                     fontWeight: 600,
                     letterSpacing: '.5px',
                     minWidth: 30,
                     textAlign: 'center',
-                    boxShadow: '0 2px 6px -2px rgba(0,0,0,0.6)'
+                    boxShadow: '0 1px 3px -1px rgba(0,0,0,0.5)'
                   }}>
                     {gp.priority}
                   </div>
                   <div>
                     <h3 style={{ 
                       margin: 0, 
-                      fontSize: '1rem',
+                      fontSize: '0.95rem',
                       fontWeight: 600, 
                       color: 'var(--text-primary)'
                     }}>
                       {gp.groupName}
                     </h3>
                     <p style={{ 
-                      margin: '4px 0 0 0', 
-                      fontSize: '0.7rem',
+                      margin: '2px 0 0 0', 
+                      fontSize: '0.68rem',
                       letterSpacing: '.3px',
                       color: 'var(--text-secondary)'
                     }}>
@@ -472,9 +470,9 @@ const PreferencePanel: React.FC<PreferencePanelProps> = ({
                   )}
                   className="btn-modern"
                   style={{
-                    padding: '6px 10px',
+                    padding: '6px 8px',
                     borderRadius: '6px',
-                    fontSize: '12px',
+                    fontSize: '11px',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '4px'
@@ -499,11 +497,11 @@ const PreferencePanel: React.FC<PreferencePanelProps> = ({
                   animation: 'slideInLeft 0.3s ease'
                 }}>
                   {/* Professor Ratings */}
-                  <div style={{ marginBottom: '20px' }}>
+                  <div style={{ marginBottom: '14px' }}>
                     <h4 className="section-title" style={{ 
                       fontSize: '.85rem', 
                       fontWeight: 600, 
-                      marginBottom: '10px', 
+                      marginBottom: '8px', 
                       color: 'rgba(230,235,245,0.9)',
                       display: 'flex',
                       alignItems: 'center',
@@ -521,15 +519,15 @@ const PreferencePanel: React.FC<PreferencePanelProps> = ({
                         display: 'flex', 
                         alignItems: 'center', 
                         justifyContent: 'space-between',
-                        marginBottom: 8,
-                        padding: '10px 12px',
-                        background: 'rgba(255,255,255,0.05)',
+                        marginBottom: 6,
+                        padding: '8px 10px',
+                        background: 'rgba(255,255,255,0.045)',
                         borderRadius: '6px',
                         border: '1px solid rgba(255,255,255,0.06)',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.4)'
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.35)'
                       }}>
                         <span style={{ 
-                          fontSize: '12px', 
+                          fontSize: '11.5px', 
                           color: 'rgba(240,245,255,0.9)',
                           fontWeight: 500,
                           letterSpacing: '.2px'
@@ -568,15 +566,15 @@ const PreferencePanel: React.FC<PreferencePanelProps> = ({
                         display: 'flex', 
                         alignItems: 'center', 
                         justifyContent: 'space-between',
-                        marginBottom: 8,
-                        padding: '10px 12px',
-                        background: 'rgba(255,255,255,0.05)',
+                        marginBottom: 6,
+                        padding: '8px 10px',
+                        background: 'rgba(255,255,255,0.045)',
                         borderRadius: '6px',
                         border: '1px solid rgba(255,255,255,0.06)',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.4)'
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.35)'
                       }}>
                         <span style={{ 
-                          fontSize: '12px', 
+                          fontSize: '11.5px', 
                           color: 'rgba(240,245,255,0.9)',
                           fontWeight: 500,
                           letterSpacing: '.2px'

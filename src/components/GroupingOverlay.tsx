@@ -18,8 +18,8 @@ interface Props {
 export const GroupingOverlay: React.FC<Props> = ({ show, onClose, selectedFaculty, setSelectedFaculty, facultyPrefixes, facultyLabel, groupingConfig, setGroupingConfig, filteredCourseNamesForGrouping }) => {
   if (!show) return null;
   return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.3)', backdropFilter:'blur(2px)', display:'flex', justifyContent:'center', alignItems:'flex-start', padding:'40px 32px', zIndex:1000 }}>
-      <div style={{ width:'780px', maxWidth:'100%', background:'#fff', borderRadius:'18px', boxShadow:'0 12px 32px rgba(0,0,0,0.25)', position:'relative', display:'flex', flexDirection:'column', maxHeight:'calc(100vh - 80px)' }}>
+    <div className="grouping-overlay" style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.3)', backdropFilter:'blur(2px)', display:'flex', justifyContent:'center', alignItems:'flex-start', padding:'40px 32px', zIndex:1000 }}>
+      <div className="grouping-overlay-container" style={{ width:'780px', maxWidth:'100%', background:'var(--card-bg)', borderRadius:'18px', boxShadow:'0 12px 32px rgba(0,0,0,0.25)', position:'relative', display:'flex', flexDirection:'column', maxHeight:'calc(100vh - 80px)', border:'1px solid var(--border-light)' }}>
         <div style={{ padding:'14px 22px', borderBottom:'1px solid var(--border-light)', display:'flex', alignItems:'center', justifyContent:'space-between', gap:'12px' }}>
           <h2 style={{ margin:0, fontSize:'1.15rem', fontWeight:700 }}>مدیریت گروه‌های انتخابی</h2>
           <div style={{ display:'flex', gap:'8px', alignItems:'center' }}>

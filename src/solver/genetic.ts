@@ -18,7 +18,7 @@ export interface GAInput {
   maxUnits?: number;
 }
 
-interface GAParams { populationSize: number; generations: number; crossoverRate: number; mutationRate: number; elitism: number; }
+interface GAParams { populationSize: number; generations: number; crossoverRate: number; mutationRate: number; elitism: number; seed?: number; }
 const DEFAULT_PARAMS: GAParams = { populationSize: 120, generations: 160, crossoverRate: 0.85, mutationRate: 0.07, elitism: 4 };
 export interface GAResult { best: Individual; history: { gen: number; best: number; avg: number }[]; population: Individual[]; }
 
@@ -95,7 +95,32 @@ function fitness(
 }
 
 // ----- Initialization -----
-function initializePopulation(popSize: number, courseGroups: CourseGroup[], courseIndex: Record<string, Course>): Individual[] {
+// Seeded RNG utilities for reproducible runs
+type RNG = { random: () => number };
+function mulberry32(seed: number): RNG {
+  let t = seed >>> 0;
+  return { random: () => {
+    t += 0x6D2B79F5;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  }};
+}
+
+function makeDeterministicSeed(input: GAInput): number {
+  const s = JSON.stringify({
+    groups: input.courseGroups?.map(g=>({ c:g.courseCodes, p:g.priority, a:(g as any).isActive })) ?? [],
+    courses: input.courses?.map(c=>({ code:c.courseCode, u:c.units||0, n:c.sections?.length||0 })) ?? [],
+    prefs: input.userPreferences ?? {},
+    min: input.minUnits ?? 0,
+    max: input.maxUnits ?? 999,
+  });
+  let hash = 2166136261 >>> 0; // FNV-1a
+  for (let i=0;i<s.length;i++) { hash ^= s.charCodeAt(i); hash = Math.imul(hash, 16777619); }
+  return hash >>> 0;
+}
+
+function initializePopulation(popSize: number, courseGroups: CourseGroup[], courseIndex: Record<string, Course>, rng: RNG): Individual[] {
   const population: Individual[] = [];
   for (let p=0; p<popSize; p++) {
     const genome: Genome = [];
@@ -103,14 +128,14 @@ function initializePopulation(popSize: number, courseGroups: CourseGroup[], cour
       const group = courseGroups[gi];
       if (!group.courseCodes.length) { genome.push(null); continue; }
       // Decide select or not
-      if (Math.random() < 0.55) {
+      if (rng.random() < 0.55) {
         // pick a random courseCode that has sections
-        const shuffled = [...group.courseCodes].sort(()=>Math.random()-0.5);
+        const shuffled = [...group.courseCodes].sort(()=>rng.random()-0.5);
         let chosen: SelectedSection | null = null;
         for (const code of shuffled) {
           const course = courseIndex[code];
             if (course && course.sections.length) {
-              const section = course.sections[Math.floor(Math.random()*course.sections.length)];
+              const section = course.sections[Math.floor(rng.random()*course.sections.length)];
               chosen = { courseCode: code, sectionCode: section.sectionCode };
               break;
             }
@@ -124,19 +149,20 @@ function initializePopulation(popSize: number, courseGroups: CourseGroup[], cour
 }
 
 // ----- Selection -----
-function tournament(pop: Individual[], k=3): Individual {
+function tournament(pop: Individual[], k=3, rng?: RNG): Individual {
   let best: Individual | null = null;
   for (let i=0;i<k;i++) {
-    const cand = pop[Math.floor(Math.random()*pop.length)];
+  const r = rng ? rng.random() : Math.random();
+  const cand = pop[Math.floor(r*pop.length)];
     if (!best || cand.fitness > best.fitness) best = cand;
   }
   return best!;
 }
 
 // ----- Crossover -----
-function crossover(a: Individual, b: Individual, rate: number): [Individual, Individual] {
-  if (Math.random() > rate || a.genome.length === 0) return [JSON.parse(JSON.stringify(a)), JSON.parse(JSON.stringify(b))];
-  const point = Math.floor(Math.random()*a.genome.length);
+function crossover(a: Individual, b: Individual, rate: number, rng: RNG): [Individual, Individual] {
+  if (rng.random() > rate || a.genome.length === 0) return [JSON.parse(JSON.stringify(a)), JSON.parse(JSON.stringify(b))];
+  const point = Math.floor(rng.random()*a.genome.length);
   const g1: Genome = [];
   const g2: Genome = [];
   for (let i=0;i<a.genome.length;i++) {
@@ -147,11 +173,11 @@ function crossover(a: Individual, b: Individual, rate: number): [Individual, Ind
 }
 
 // ----- Mutation -----
-function mutate(ind: Individual, courseGroups: CourseGroup[], courseIndex: Record<string, Course>, rate: number) {
-  for (let i=0;i<ind.genome.length;i++) if (Math.random() < rate) {
+function mutate(ind: Individual, courseGroups: CourseGroup[], courseIndex: Record<string, Course>, rate: number, rng: RNG) {
+  for (let i=0;i<ind.genome.length;i++) if (rng.random() < rate) {
     const group = courseGroups[i];
     if (!group.courseCodes.length) continue;
-    const op = Math.random();
+    const op = rng.random();
     const current = ind.genome[i];
     // 4 mutation types as specified
     if (current && op < 0.25) {
@@ -160,7 +186,7 @@ function mutate(ind: Individual, courseGroups: CourseGroup[], courseIndex: Recor
       if (course && course.sections.length) {
         const others = course.sections.filter(s => s.sectionCode !== current.sectionCode);
         if (others.length) {
-          const sec = others[Math.floor(Math.random()*others.length)];
+          const sec = others[Math.floor(rng.random()*others.length)];
           ind.genome[i] = { courseCode: course.courseCode, sectionCode: sec.sectionCode };
         }
       }
@@ -168,20 +194,20 @@ function mutate(ind: Individual, courseGroups: CourseGroup[], courseIndex: Recor
       // change to another course in same group
       const altCodes = group.courseCodes.filter(c => c !== current.courseCode);
       if (altCodes.length) {
-        const code = altCodes[Math.floor(Math.random()*altCodes.length)];
+        const code = altCodes[Math.floor(rng.random()*altCodes.length)];
         const course = courseIndex[code];
         if (course && course.sections.length) {
-          const sec = course.sections[Math.floor(Math.random()*course.sections.length)];
+          const sec = course.sections[Math.floor(rng.random()*course.sections.length)];
           ind.genome[i] = { courseCode: code, sectionCode: sec.sectionCode };
         }
       }
     } else if (!current && op < 0.75) {
       // add a course (currently null)
-      const shuffled = [...group.courseCodes].sort(()=>Math.random()-0.5);
+      const shuffled = [...group.courseCodes].sort(()=>rng.random()-0.5);
       for (const code of shuffled) {
         const course = courseIndex[code];
         if (course && course.sections.length) {
-          const sec = course.sections[Math.floor(Math.random()*course.sections.length)];
+          const sec = course.sections[Math.floor(rng.random()*course.sections.length)];
           ind.genome[i] = { courseCode: code, sectionCode: sec.sectionCode };
           break;
         }
@@ -196,9 +222,12 @@ function mutate(ind: Individual, courseGroups: CourseGroup[], courseIndex: Recor
 // ----- Run GA -----
 export function runGenetic(input: GAInput, params: Partial<GAParams> = {}): GAResult {
   const cfg = { ...DEFAULT_PARAMS, ...params };
+  // Create RNG using provided seed or derive a deterministic one from inputs
+  const seed = (cfg.seed ?? makeDeterministicSeed(input)) >>> 0;
+  const rng = mulberry32(seed);
   const courseIndex = buildCourseIndex(input.courses);
 
-  let population = initializePopulation(cfg.populationSize, input.courseGroups, courseIndex);
+  let population = initializePopulation(cfg.populationSize, input.courseGroups, courseIndex, rng);
   population.forEach(ind => ind.fitness = fitness(ind, courseIndex, input.preferences, input.userPreferences, input.minUnits, input.maxUnits, input.courseGroups));
 
   const history: { gen: number; best: number; avg: number }[] = [];
@@ -212,11 +241,11 @@ export function runGenetic(input: GAInput, params: Partial<GAParams> = {}): GARe
     for (let e=0; e<cfg.elitism && e<population.length; e++) next.push(JSON.parse(JSON.stringify(population[e])));
 
     while (next.length < cfg.populationSize) {
-      const p1 = tournament(population);
-      const p2 = tournament(population);
-      const [c1,c2] = crossover(p1,p2,cfg.crossoverRate);
-  mutate(c1, input.courseGroups, courseIndex, cfg.mutationRate);
-  mutate(c2, input.courseGroups, courseIndex, cfg.mutationRate);
+      const p1 = tournament(population, 3, rng);
+      const p2 = tournament(population, 3, rng);
+      const [c1,c2] = crossover(p1,p2,cfg.crossoverRate, rng);
+  mutate(c1, input.courseGroups, courseIndex, cfg.mutationRate, rng);
+  mutate(c2, input.courseGroups, courseIndex, cfg.mutationRate, rng);
   c1.fitness = fitness(c1, courseIndex, input.preferences, input.userPreferences, input.minUnits, input.maxUnits, input.courseGroups);
   c2.fitness = fitness(c2, courseIndex, input.preferences, input.userPreferences, input.minUnits, input.maxUnits, input.courseGroups);
       next.push(c1);

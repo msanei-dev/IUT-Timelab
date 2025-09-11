@@ -3,17 +3,13 @@
 const fs = require('fs');
 const path = require('path');
 
-// Prefer public/data.json as the source of truth during dev
-const srcDev = path.join(__dirname, 'public', 'data.json');
-// Legacy/fallback source near code (if present)
-const srcLegacy = path.join(__dirname, 'src', 'data.json');
+const src = path.join(__dirname, 'src', 'data.json');
 const destDir = path.join(__dirname, '.webpack', 'main');
 const dest = path.join(destDir, 'data.json');
 
 function safeCopy() {
-  const src = fs.existsSync(srcDev) ? srcDev : (fs.existsSync(srcLegacy) ? srcLegacy : null);
-  if (!src) {
-    console.warn('[copy-data] No data.json found in public/ or src/ – skipping copy.');
+  if (!fs.existsSync(src)) {
+    console.warn('[copy-data] src/data.json not found – skipping copy.');
     return;
   }
   try {

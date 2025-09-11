@@ -67,7 +67,7 @@ app/build/
 tmp/
 temp/
 
-# Office temporary files
+# Office temporary lock files
 ~$*
 
 # Lock files (choose one based on your package manager)

@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface Props {
   currentIdx: number;
@@ -6,7 +7,31 @@ interface Props {
   total: number;
 }
 
+const useWindowSize = () => {
+  const [windowSize, setWindowSize] = useState({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowSize({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  return windowSize;
+};
+
 const PlanNavigator: React.FC<Props> = ({ currentIdx, setCurrentIdx, total }) => {
+  const { width } = useWindowSize();
+  const isSmall = width < 600;
+  const iconSize = Math.max(10, Math.min(14, width * 0.025));
   if (total === 0) {
     return (
       <div className="glass-card" style={{
@@ -43,49 +68,49 @@ const PlanNavigator: React.FC<Props> = ({ currentIdx, setCurrentIdx, total }) =>
     <div style={{
       display: 'flex', 
       alignItems: 'center',
-      gap: '12px'
+      gap: 'clamp(8px, 2vw, 12px)',
+      flexWrap: 'wrap',
+      justifyContent: 'center'
     }}>
       <button 
         onClick={() => setCurrentIdx(currentIdx - 1)} 
         disabled={currentIdx === 0} 
         className={`btn-modern ${currentIdx === 0 ? 'btn-disabled' : 'btn-primary'}`}
         style={{
-          padding: '8px 12px', 
-          fontSize: '0.85rem', 
-          borderRadius: '6px', 
+          padding: 'clamp(6px, 1.5vw, 8px) clamp(8px, 2vw, 12px)', 
+          fontSize: 'clamp(0.75rem, 2vw, 0.85rem)', 
+          borderRadius: '8px', 
           cursor: currentIdx === 0 ? 'not-allowed' : 'pointer',
           fontWeight: '500',
           display: 'flex',
           alignItems: 'center',
-          gap: '6px',
+          gap: 'clamp(4px, 1vw, 6px)',
           transition: 'all 0.3s ease',
-          height: '40px'
+          height: 'clamp(32px, 8vw, 40px)',
+          minWidth: 'clamp(60px, 15vw, 80px)',
+          justifyContent: 'center'
         }}
       >
-        <svg className="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={currentIdx === 0 ? 'var(--text-secondary)' : '#fff'} strokeWidth="2">
-          <path d="M15 18l-6-6 6-6"/>
-        </svg>
-        قبلی
+        <ChevronRight size={iconSize} color={currentIdx === 0 ? 'var(--text-secondary)' : '#fff'} strokeWidth={2} />
+        {isSmall ? 'قبل' : 'قبلی'}
       </button>
 
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '8px',
-        padding: '8px 12px',
+        gap: 'clamp(4px, 1vw, 6px)',
+        padding: 'clamp(4px, 1vw, 6px) clamp(8px, 2vw, 12px)',
         background: 'var(--primary-gradient)',
         borderRadius: '8px',
         color: '#fff',
         fontWeight: '600',
-        fontSize: '0.85rem',
-        height: '40px'
+        fontSize: 'clamp(0.7rem, 1.8vw, 0.8rem)',
+        height: 'clamp(28px, 7vw, 32px)',
+        minHeight: 'clamp(28px, 7vw, 32px)',
+        minWidth: 'clamp(50px, 12vw, 65px)',
+        justifyContent: 'center'
       }}>
-        <svg className="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2">
-          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-          <line x1="16" y1="2" x2="16" y2="6"/>
-          <line x1="8" y1="2" x2="8" y2="6"/>
-          <line x1="3" y1="10" x2="21" y2="10"/>
-        </svg>
+        <Calendar size={iconSize} color="#1e3a8a" strokeWidth={2.5} />
         <span>{currentIdx + 1}/{total}</span>
       </div>
 
@@ -94,22 +119,22 @@ const PlanNavigator: React.FC<Props> = ({ currentIdx, setCurrentIdx, total }) =>
         disabled={currentIdx === total - 1} 
         className={`btn-modern ${currentIdx === total - 1 ? 'btn-disabled' : 'btn-primary'}`}
         style={{
-          padding: '8px 12px', 
-          fontSize: '0.85rem', 
-          borderRadius: '6px', 
+          padding: 'clamp(6px, 1.5vw, 8px) clamp(8px, 2vw, 12px)', 
+          fontSize: 'clamp(0.75rem, 2vw, 0.85rem)', 
+          borderRadius: '8px', 
           cursor: currentIdx === total - 1 ? 'not-allowed' : 'pointer',
           fontWeight: '500',
           display: 'flex',
           alignItems: 'center',
-          gap: '6px',
+          gap: 'clamp(4px, 1vw, 6px)',
           transition: 'all 0.3s ease',
-          height: '40px'
+          height: 'clamp(32px, 8vw, 40px)',
+          minWidth: 'clamp(60px, 15vw, 80px)',
+          justifyContent: 'center'
         }}
       >
-        بعدی
-        <svg className="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={currentIdx === total - 1 ? 'var(--text-secondary)' : '#fff'} strokeWidth="2">
-          <path d="M9 18l6-6-6-6"/>
-        </svg>
+        {isSmall ? 'بعد' : 'بعدی'}
+        <ChevronLeft size={iconSize} color={currentIdx === total - 1 ? 'var(--text-secondary)' : '#fff'} strokeWidth={2} />
       </button>
     </div>
   );

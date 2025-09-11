@@ -85,20 +85,21 @@ const GroupManager: React.FC<Props> = ({ allCourseNames, value, onChange }) => {
     gap: '16px',
     maxHeight: 'calc(100vh - 220px)',
     overflow: 'hidden',
-    boxSizing: 'border-box'
+  boxSizing: 'border-box',
+  color: 'var(--text-primary)'
   };
   // جلوگیری از drag برای اجازه تایپ داخل input ها
   (containerStyle as any).WebkitAppRegion = 'no-drag';
 
   return (
-    <div className="card" style={containerStyle}>
-      <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>مدیریت گروه‌ها</h3>
+    <div className="card card-solid" style={containerStyle}>
+      <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color:'var(--text-primary)' }}>مدیریت گروه‌ها</h3>
       <div style={{ display: 'flex', gap: '8px' }}>
         <input value={newGroupName} onChange={e => setNewGroupName(e.target.value)} placeholder="نام گروه جدید" className="form-control" style={{ flex: 1, fontSize: '0.85rem' }} />
         <button onClick={createGroup} className="btn btn-secondary" disabled={!newGroupName.trim()} style={{ fontSize: '0.75rem' }}>ایجاد</button>
       </div>
       <div style={{ display:'flex', gap:'12px', alignItems:'stretch', minHeight: '320px', flex:1, overflow:'hidden' }}>
-        <div style={{ flex:1, minWidth: '180px', maxHeight:'340px', overflowY:'auto', border:'1px solid var(--border-light)', borderRadius: '10px', background:'var(--bg-soft)' }}>
+  <div className="gm-sidebar" style={{ flex:1, minWidth: '180px', maxHeight:'340px', overflowY:'auto' }}>
           {groups.length === 0 && <div style={{ padding:'12px', fontSize:'0.75rem', color:'var(--text-secondary)' }}>هیچ گروهی نیست</div>}
           {groups.map(g => {
             const isSel = selectedGroupId===g.id;
@@ -107,8 +108,8 @@ const GroupManager: React.FC<Props> = ({ allCourseNames, value, onChange }) => {
                 key={g.id}
                 style={{
                   padding:'10px 12px',
-                  borderBottom: '1px solid var(--border-light)',
-                  background: isSel ? 'linear-gradient(90deg,var(--bg-accent),rgba(0,0,0,0))' : 'transparent',
+                  borderBottom: '1px solid var(--gm-sidebar-item-border)',
+                  background: isSel ? 'var(--gm-sidebar-selected-bg)' : 'transparent',
                   cursor:'pointer',
                   display:'flex',
                   alignItems:'center',
@@ -118,8 +119,8 @@ const GroupManager: React.FC<Props> = ({ allCourseNames, value, onChange }) => {
                 }}
                 onClick={() => setSelectedGroupId(g.id)}
               >
-                <div style={{ fontSize:'0.82rem', fontWeight:600, display:'flex', flexDirection:'column', flex:1 }}>
-                  <span style={{ lineHeight:1.2 }}>{g.name}</span>
+                <div style={{ fontSize:'0.82rem', fontWeight:600, display:'flex', flexDirection:'column', flex:1, color:'var(--text-primary)' }}>
+                  <span style={{ lineHeight:1.2, color:'var(--text-primary)' }}>{g.name}</span>
                   <span style={{ color:'var(--text-secondary)', fontWeight:400, fontSize:'0.65rem' }}>{g.courseNames.length} درس</span>
                 </div>
                 <div style={{ display:'flex', gap:4 }}>
@@ -143,19 +144,20 @@ const GroupManager: React.FC<Props> = ({ allCourseNames, value, onChange }) => {
           {selectedGroup ? (
             <>
               <div style={{ display:'flex', flexWrap:'wrap', gap:'10px', alignItems:'center', justifyContent:'space-between' }}>
-                <div style={{ display:'flex', gap:'8px', alignItems:'baseline' }}>
-                  <strong style={{ fontSize:'0.95rem' }}>{selectedGroup.name}</strong>
+                <div style={{ display:'flex', gap:'8px', alignItems:'baseline', color:'var(--text-primary)' }}>
+                  <strong style={{ fontSize:'0.95rem', color:'var(--text-primary)' }}>{selectedGroup.name}</strong>
                   <span style={{ fontSize:'0.65rem', color:'var(--text-secondary)' }}>انتخاب / حذف درس‌ها</span>
                 </div>
                 <div style={{ display:'flex', gap:4 }}>
-                  <button
+          <button
                     onClick={() => setLayoutMode('grid')}
                     style={{
                       fontSize:'0.6rem',
                       padding:'4px 8px',
                       borderRadius:6,
-                      border: layoutMode==='grid' ? '1px solid var(--primary-color)' : '1px solid var(--border-light)',
-                      background: layoutMode==='grid' ? 'var(--bg-accent)' : 'white',
+            border: layoutMode==='grid' ? '1px solid var(--primary-color)' : '1px solid var(--border-light)',
+            background: layoutMode==='grid' ? 'var(--bg-accent)' : 'var(--bg-tertiary)',
+                      color: 'var(--text-primary)',
                       cursor:'pointer'
                     }}
                   >شبکه</button>
@@ -165,8 +167,9 @@ const GroupManager: React.FC<Props> = ({ allCourseNames, value, onChange }) => {
                       fontSize:'0.6rem',
                       padding:'4px 8px',
                       borderRadius:6,
-                      border: layoutMode==='list' ? '1px solid var(--primary-color)' : '1px solid var(--border-light)',
-                      background: layoutMode==='list' ? 'var(--bg-accent)' : 'white',
+            border: layoutMode==='list' ? '1px solid var(--primary-color)' : '1px solid var(--border-light)',
+            background: layoutMode==='list' ? 'var(--bg-accent)' : 'var(--bg-tertiary)',
+                      color: 'var(--text-primary)',
                       cursor:'pointer'
                     }}
                   >لیست</button>
@@ -177,7 +180,7 @@ const GroupManager: React.FC<Props> = ({ allCourseNames, value, onChange }) => {
                 <span>روی یک درس کلیک کنید تا به گروه اضافه/حذف شود.</span>
                 <span style={{ direction:'ltr' }}>اسکرول ↑↓</span>
               </div>
-              <div
+        <div
                 style={{
                   display: layoutMode==='grid' ? 'grid' : 'block',
                   gridTemplateColumns: layoutMode==='grid' ? 'repeat(auto-fill,minmax(170px,1fr))' : undefined,
@@ -186,9 +189,9 @@ const GroupManager: React.FC<Props> = ({ allCourseNames, value, onChange }) => {
                   overflowY:'auto',
                   padding:'6px',
                   minHeight:'220px',
-                  border:'1px solid var(--border-light)',
+          border:'1px solid var(--gm-course-scroll-border)',
                   borderRadius:'8px',
-                  background:'#fff'
+          background:'var(--gm-course-scroll-bg)'
                 }}
               >
                 {filteredCourses.map((cn, idx) => {
@@ -197,14 +200,15 @@ const GroupManager: React.FC<Props> = ({ allCourseNames, value, onChange }) => {
                     fontSize:'0.7rem',
                     lineHeight:1.25,
                     borderRadius:'10px',
-                    border: active ? '1px solid var(--primary-color)' : '1px solid rgba(0,0,0,0.1)',
-                    background: active ? 'linear-gradient(135deg, rgba(30,64,175,0.22), rgba(30,64,175,0.12))' : 'linear-gradient(135deg,#eef2f7,#e2e8f0)',
+                    border: active ? '1px solid var(--gm-course-item-active-border)' : '1px solid var(--gm-course-item-border)',
+                    background: active ? 'var(--gm-course-item-active-bg)' : 'var(--gm-course-item-bg)',
+                    color: 'var(--text-primary)',
                     cursor:'pointer',
                     textAlign:'start',
                     width:'100%',
                     padding: layoutMode==='grid' ? '12px 12px 14px 14px' : '12px 14px',
                     position:'relative',
-                    boxShadow: active ? '0 3px 6px -1px rgba(30,64,175,0.35), 0 0 0 1px rgba(30,64,175,0.3)' : '0 1px 2px rgba(0,0,0,0.08)',
+                    boxShadow: active ? 'var(--gm-course-item-shadow-active)' : 'var(--gm-course-item-shadow)',
                     transition:'background 140ms, box-shadow 140ms, border-color 140ms, transform 140ms',
                     display:'flex',
                     flexDirection:'column',
@@ -226,7 +230,7 @@ const GroupManager: React.FC<Props> = ({ allCourseNames, value, onChange }) => {
                       onMouseEnter={e => (e.currentTarget.style.transform='translateY(-2px)')}
                       onMouseLeave={e => (e.currentTarget.style.transform='translateY(0)')}
                     >
-                      <span style={{ position:'absolute', top:0, left:0, width: active ? 4 : 4, height:'100%', background: active ? 'var(--primary-color)' : 'rgba(0,0,0,0.08)' }} />
+                      <span style={{ position:'absolute', top:0, left:0, width: 4, height:'100%', background: active ? 'var(--primary-color)' : 'var(--gm-course-item-indicator-muted)' }} />
                       <div style={{ display:'flex', width:'100%', justifyContent:'space-between', alignItems:'flex-start', gap:8 }}>
                         <div style={{ flex:1, display:'flex', flexDirection:'column', gap:4 }}>
                           {highlightMatch(cn)}

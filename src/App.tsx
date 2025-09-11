@@ -22,6 +22,9 @@ import TitleBar from './components/TitleBar';
 
 const api = (window as any).api;
 
+// Toggle to show/hide the course data add/import controls globally
+const SHOW_COURSE_DATA_IMPORT = false; // set to false to hide DataInput and Excel import button
+
 const App: React.FC = () => {
   const { courseNames, courses, courseNameMapping, reload } = useCourseData();
   const [selected, setSelected] = useState<string[]>([]);
@@ -173,14 +176,14 @@ const App: React.FC = () => {
       const minU = minUnits === '' ? 0 : Number(minUnits);
       const maxU = maxUnits === '' ? Infinity : Number(maxUnits || Infinity);
       const userPrefsFull = buildUserPreferences();
-      const gaResult = runGenetic({
+  const gaResult = runGenetic({
         courseGroups: activeGroups,
         courses,
         preferences,
         userPreferences: userPrefsFull,
         minUnits: minU,
         maxUnits: maxU
-      }, { populationSize: 140, generations: 120 });
+  }, { populationSize: 140, generations: 120 });
 
       // Collect unique schedules from population (top N)
       const seen = new Set<string>();
@@ -513,10 +516,12 @@ const App: React.FC = () => {
 
         {activeTab === 'courses' ? (
           <div className="card" style={{ padding: '16px', position:'relative' }}>
-            <DataInput 
-              onDataSubmit={handleDataSubmit} 
-              onFileUpload={handleFileUpload}
-            />
+            {SHOW_COURSE_DATA_IMPORT && (
+              <DataInput 
+                onDataSubmit={handleDataSubmit} 
+                onFileUpload={handleFileUpload}
+              />
+            )}
             <button
               onClick={() => setShowGroups(true)}
               className="btn btn-secondary"
@@ -649,24 +654,26 @@ const App: React.FC = () => {
                   </svg>
                   حذف
                 </button>
-                <button 
-                  onClick={importFromExcel}
-                  disabled={loading}
-                  className="btn btn-secondary"
-                  style={{
-                    fontSize: '12px',
-                    fontWeight: '600',
-                    padding: '8px 12px'
-                  }}
-                  title="خواندن دروس از فایل اکسل"
-                >
-                  <svg className="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                    <polyline points="14,2 14,8 20,8" />
-                    <path d="M9 15h6M9 12h6M9 9h6" />
-                  </svg>
-                  اکسل
-                </button>
+                {SHOW_COURSE_DATA_IMPORT && (
+                  <button 
+                    onClick={importFromExcel}
+                    disabled={loading}
+                    className="btn btn-secondary"
+                    style={{
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      padding: '8px 12px'
+                    }}
+                    title="خواندن دروس از فایل اکسل"
+                  >
+                    <svg className="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14,2 14,8 20,8" />
+                      <path d="M9 15h6M9 12h6M9 9h6" />
+                    </svg>
+                    اکسل
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -712,10 +719,10 @@ const App: React.FC = () => {
         filteredCourseNamesForGrouping={filteredCourseNamesForGrouping}
       />
       {showCourseBrowser && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:120 }}>
-          <div className="card" style={{ width:'900px', maxWidth:'95%', maxHeight:'90vh', overflow:'hidden', padding:20, position:'relative' }}>
-            <button onClick={()=>setShowCourseBrowser(false)} style={{ position:'absolute', top:10, left:10, border:'1px solid var(--border-light)', background:'var(--bg-soft)', padding:'4px 10px', borderRadius:8, cursor:'pointer', fontSize:12 }}>بستن</button>
-            <h2 style={{ margin:'0 0 12px', fontSize:'1rem', fontWeight:700 }}>لیست کامل دروس</h2>
+        <div className="modal-overlay">
+          <div className="card course-browser">
+            <button onClick={()=>setShowCourseBrowser(false)} className="modal-close">بستن</button>
+            <h2 className="modal-title">لیست کامل دروس</h2>
             <div style={{ height:'calc(100% - 40px)', overflow:'auto' }}>
               <CourseSelector courseNames={courseNames} selected={selected} setSelected={setSelected} />
             </div>
@@ -737,24 +744,31 @@ const App: React.FC = () => {
       }}>
         {(gaSchedules ? gaSchedules : schedules).length > 0 ? (
           <>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12 }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: 12,
+              flexWrap: 'wrap',
+              rowGap: 8
+            }}>
               <ScheduleHeader schedules={(gaSchedules? gaSchedules : schedules) as any} currentIdx={currentIdx} setCurrentIdx={setCurrentIdx} />
               <button
                 onClick={()=>setShowScoreDetails(true)}
                 style={{
-                  background:'linear-gradient(90deg,#6366f1,#4f46e5)',
-                  border:'1px solid rgba(255,255,255,0.15)',
-                  color:'#fff',
-                  fontSize:12,
-                  fontWeight:600,
-                  padding:'8px 16px',
-                  borderRadius:10,
-                  cursor:'pointer',
-                  display:'flex',
-                  alignItems:'center',
-                  gap:6,
-                  boxShadow:'0 4px 14px -4px rgba(79,70,229,0.6)',
-                  height:'40px'
+                  background: 'var(--primary-gradient)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  color: '#fff',
+                  fontSize: '0.85rem',
+                  fontWeight: '600',
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: '0 4px 14px -4px rgba(37,99,235,0.4)',
+                  height: '40px'
                 }}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2">

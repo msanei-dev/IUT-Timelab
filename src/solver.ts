@@ -1,38 +1,14 @@
 // Backtracking solver and scoring engine for Smart University Course Scheduler
 import fs from 'fs';
 import path from 'path';
-import { app } from 'electron';
 import { DataFile, Course, Section, ScheduleSection, TimeSlot, Day } from './shared/types';
 import { GroupingConfig, generateSelectionScenarios, buildGroupIndex, generateOptionalScenarios } from './grouping';
 import { calculateScore } from './solver/scoring';
 import { analyzeConflicts } from './solver/conflicts';
 
-// Resolve the data file path with sensible fallbacks
-function resolveDataFilePath(): string {
-  const isProd = process.env.NODE_ENV === 'production';
-
-  if (!isProd) {
-    // Development: always prefer public/data.json to reflect live edits
-    const devPublic = path.join(process.cwd(), 'public', 'data.json');
-    if (fs.existsSync(devPublic)) return devPublic;
-  }
-
-  try {
-    // Production: prefer user-writable data in userData folder (created by Electron)
-    const userDataPath = path.join(app.getPath('userData'), 'data.json');
-    if (fs.existsSync(userDataPath)) return userDataPath;
-  } catch {
-    // app may not be ready yet; ignore and use fallbacks
-  }
-
-  // Fallback to bundled neighbor (e.g., copied next to main bundle)
-  const bundled = path.join(__dirname, 'data.json');
-  return bundled;
-}
-
 // Load data.json
 export function loadData(): DataFile {
-  const dataPath = resolveDataFilePath();
+  const dataPath = path.join(__dirname, 'data.json');
   const raw = fs.readFileSync(dataPath, 'utf-8');
   return JSON.parse(raw);
 }
