@@ -223,6 +223,15 @@
 /* Preference / glass-card legacy class hook */
 :root[data-theme='dark'] .glass-card { background: var(--panel-glass) !important; border: 1px solid var(--glass-border) !important; backdrop-filter: blur(18px) saturate(150%); }
 
+/* When a glass-card is also a primary button, keep the button's gradient in dark mode */
+:root[data-theme='dark'] .glass-card.btn-primary,
+:root[data-theme='dark'] .glass-card.btn-modern.btn-primary {
+  background: linear-gradient(135deg, rgba(59,130,246,0.85), rgba(29,78,216,0.82)) !important;
+  border-color: rgba(255,255,255,0.15) !important;
+  color: #ffffff !important;
+  box-shadow: 0 6px 20px -6px rgba(37,99,235,0.6);
+}
+
 body {
   transition: background .4s, color .3s;
 }
@@ -288,9 +297,9 @@ body {
 
 .theme-toggle:hover::before { opacity: .42; }
 
-/* Keep non-.btn buttons inheriting text color */
-button:not(.btn) { color: inherit !important; }
-button:not(.btn):hover { color: inherit !important; }
+/* Keep non-.btn/.btn-modern buttons inheriting text color */
+button:not(.btn):not(.btn-modern) { color: inherit !important; }
+button:not(.btn):not(.btn-modern):hover { color: inherit !important; }
 
 .theme-toggle:hover { border-color: rgba(255,255,255,0.18); box-shadow: 0 6px 18px -8px rgba(0,0,0,0.7), inset 0 0 0 1px rgba(255,255,255,0.05); }
 .theme-toggle:active::after { transform: translateX(var(--knob-x,0)) scale(.96); }
@@ -788,12 +797,12 @@ button:disabled {
   color: var(--text-muted) !important;
 }
 
-/* General button text color fix */
-button {
+/* General button text color fix (exclude styled buttons) */
+button:not(.btn):not(.btn-modern) {
   color: inherit !important;
 }
 
-button:hover {
+button:not(.btn):not(.btn-modern):hover {
   color: inherit !important;
 }
 

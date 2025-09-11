@@ -18,6 +18,8 @@ export interface Section {
   sectionCode: string;
   professor: Professor;
   schedule: TimeSlot[];
+  // Optional notes (Excel column M: توضیحات)
+  notes?: string;
 }
 
 export interface Course {

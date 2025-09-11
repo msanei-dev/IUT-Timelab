@@ -143,6 +143,25 @@ function initializePopulation(popSize: number, courseGroups: CourseGroup[], cour
         genome.push(chosen);
       } else genome.push(null);
     }
+    // Ensure at least one selection to avoid empty schedule penalty dominating
+    if (genome.every(g => g === null)) {
+      // try to force-pick one random valid course from any non-empty group
+      const nonEmptyGroups = courseGroups
+        .map((g, idx) => ({ g, idx }))
+        .filter(({ g }) => g.courseCodes && g.courseCodes.length);
+      if (nonEmptyGroups.length) {
+        const { g, idx } = nonEmptyGroups[Math.floor(rng.random()*nonEmptyGroups.length)];
+        const shuffled = [...g.courseCodes].sort(()=>rng.random()-0.5);
+        for (const code of shuffled) {
+          const course = courseIndex[code];
+          if (course && course.sections.length) {
+            const section = course.sections[Math.floor(rng.random()*course.sections.length)];
+            genome[idx] = { courseCode: code, sectionCode: section.sectionCode };
+            break;
+          }
+        }
+      }
+    }
     population.push({ genome, fitness: 0, units: 0 });
   }
   return population;
@@ -215,6 +234,24 @@ function mutate(ind: Individual, courseGroups: CourseGroup[], courseIndex: Recor
     } else {
       // remove existing selection (set null)
       if (current) ind.genome[i] = null;
+    }
+  }
+  // Guard: ensure not all genes became null
+  if (ind.genome.every(g => g === null)) {
+    const nonEmptyGroups = courseGroups
+      .map((g, idx) => ({ g, idx }))
+      .filter(({ g }) => g.courseCodes && g.courseCodes.length);
+    if (nonEmptyGroups.length) {
+      const { g, idx } = nonEmptyGroups[Math.floor(rng.random()*nonEmptyGroups.length)];
+      const shuffled = [...g.courseCodes].sort(()=>rng.random()-0.5);
+      for (const code of shuffled) {
+        const course = courseIndex[code];
+        if (course && course.sections.length) {
+          const sec = course.sections[Math.floor(rng.random()*course.sections.length)];
+          ind.genome[idx] = { courseCode: code, sectionCode: sec.sectionCode };
+          break;
+        }
+      }
     }
   }
 }

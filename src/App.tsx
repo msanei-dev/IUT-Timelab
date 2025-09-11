@@ -50,7 +50,9 @@ const App: React.FC = () => {
       courses.forEach(c => {
         // Only include course codes for selected faculty (by prefix) when a faculty is chosen
         const inSelectedFaculty = !selectedFaculty || (c.courseCode && c.courseCode.toString().startsWith(selectedFaculty));
-        if (inSelectedFaculty && g.courseNames.includes(c.courseName)) {
+        // Only include courses that have at least one section (selectable)
+        const hasSections = Array.isArray(c.sections) && c.sections.length > 0;
+        if (inSelectedFaculty && hasSections && g.courseNames.includes(c.courseName)) {
           codes.push(c.courseCode);
         }
       });
@@ -175,8 +177,13 @@ const App: React.FC = () => {
   const generateGASchedules = async () => {
     if (!courses || !courses.length) { alert('ابتدا داده دروس را وارد کنید'); return; }
   if (!courseGroups.length) { alert('ابتدا گروه درسی بسازید'); return; }
-  const activeGroups = courseGroups.filter(g => g.isActive);
-  if (!activeGroups.length) { alert('هیچ گروه فعالی برای محاسبه وجود ندارد (همه Off هستند).'); return; }
+  const activeGroupsRaw = courseGroups.filter(g => g.isActive);
+  if (!activeGroupsRaw.length) { alert('هیچ گروه فعالی برای محاسبه وجود ندارد (همه Off هستند).'); return; }
+  const activeGroups = activeGroupsRaw.filter(g => g.courseCodes && g.courseCodes.length > 0);
+  if (!activeGroups.length) {
+    alert('هیچ گزینه‌ای برای انتخاب در گروه‌های فعال یافت نشد. لطفاً در "مدیریت گروه‌ها" مطمئن شوید هر گروه فعال حداقل یک درس دارای سکشن دارد.');
+    return;
+  }
     setCurrentIdx(0);
     try {
       // Basic params can be tuned later / maybe add UI controls
@@ -710,7 +717,13 @@ const App: React.FC = () => {
           </div>
         ) : (
           <div className="card" style={{ padding: '16px' }}>
-            <CourseDetails courses={courses} />
+            <CourseDetails 
+              courses={courses} 
+              activeCourseCodes={courseGroups
+                .filter(g=>g.isActive)
+                .flatMap(g=>g.courseCodes)
+                .filter(code => (courses||[]).some(c=>c.courseCode===code && c.sections && c.sections.length>0))}
+            />
           </div>
         )}
       </div>

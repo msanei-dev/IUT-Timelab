@@ -2,9 +2,11 @@ import React from 'react';
 
 interface Props {
   courses: any;
+  // Optional: if provided, only show courses whose courseCode is in this list (active groups)
+  activeCourseCodes?: string[];
 }
 
-const CourseDetails: React.FC<Props> = ({ courses }) => {
+const CourseDetails: React.FC<Props> = ({ courses, activeCourseCodes }) => {
   if (!courses || !courses.courses) return null;
 
   const formatSchedule = (schedule: any[]) => {
@@ -24,6 +26,12 @@ const CourseDetails: React.FC<Props> = ({ courses }) => {
       return `${dayNames[slot.day] || slot.day} ${slot.start}-${slot.end}`;
     }).join(', ');
   };
+
+  // Filter by active groups if activeCourseCodes provided
+  const courseList = Array.isArray(courses) ? courses : courses.courses;
+  const filtered = Array.isArray(activeCourseCodes) && activeCourseCodes.length
+    ? courseList.filter((c: any) => activeCourseCodes.includes(c.courseCode))
+    : courseList;
 
   return (
     <div style={{
@@ -48,7 +56,7 @@ const CourseDetails: React.FC<Props> = ({ courses }) => {
         overflowY: 'auto',
         fontSize: '13px'
       }}>
-        {courses.courses.map((course: any, idx: number) => (
+  {filtered.map((course: any, idx: number) => (
           <div key={idx} style={{
             marginBottom: '16px',
             padding: '12px',
@@ -79,6 +87,11 @@ const CourseDetails: React.FC<Props> = ({ courses }) => {
                 <div style={{ color: 'var(--text-muted)', marginTop: '4px' }}>
                   {formatSchedule(section.schedule)}
                 </div>
+                {section.notes && (
+                  <div style={{ color: 'var(--text-primary)', marginTop: '6px', background:'rgba(255,255,255,0.06)', padding:'6px 8px', borderRadius:6 }}>
+                    {section.notes}
+                  </div>
+                )}
               </div>
             ))}
           </div>

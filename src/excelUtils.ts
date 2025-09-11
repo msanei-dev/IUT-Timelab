@@ -232,7 +232,8 @@ export function parseExcelToCourses(fileBuffer: Buffer): Course[] {
       const section: Section = {
         sectionCode: sectionCode,
         professor: professor,
-        schedule: uniqueSchedule
+        schedule: uniqueSchedule,
+        notes: rowData.notes || undefined
       };
       
       console.log('Created section:', section);
