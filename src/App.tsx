@@ -23,7 +23,7 @@ import TitleBar from './components/TitleBar';
 const api = (window as any).api;
 
 // Toggle to show/hide the course data add/import controls globally
-const SHOW_COURSE_DATA_IMPORT = false; // set to false to hide DataInput and Excel import button
+const SHOW_COURSE_DATA_IMPORT = true; // set to false to hide DataInput and Excel import button
 
 const App: React.FC = () => {
   const { courseNames, courses, courseNameMapping, reload } = useCourseData();
@@ -37,6 +37,8 @@ const App: React.FC = () => {
   const [showCourseBrowser, setShowCourseBrowser] = useState(false);
   const { schedules, currentIdx, setCurrentIdx, loading, groupingConfig, setGroupingConfig, options, setOptions, generate } = useScheduling({ groups: [] });
   const [preferences, setPreferences] = useState<any[]>([]);
+  // Faculty filter (prefix-based) should be available before syncing effect uses it
+  const [selectedFaculty, setSelectedFaculty] = useState<string | null>(null);
   // همگام سازی بین GroupManager (groupingConfig) و مدل جدید CourseGroup
   useEffect(()=>{
     if (!courses) return;
@@ -45,7 +47,13 @@ const App: React.FC = () => {
     for (const g of courseGroups) prevMap[g.id] = g;
     const derived: CourseGroup[] = legacy.map((g, idx) => {
       const codes: string[] = [];
-      courses.forEach(c => { if (g.courseNames.includes(c.courseName)) codes.push(c.courseCode); });
+      courses.forEach(c => {
+        // Only include course codes for selected faculty (by prefix) when a faculty is chosen
+        const inSelectedFaculty = !selectedFaculty || (c.courseCode && c.courseCode.toString().startsWith(selectedFaculty));
+        if (inSelectedFaculty && g.courseNames.includes(c.courseName)) {
+          codes.push(c.courseCode);
+        }
+      });
       const prev = prevMap[g.id];
       return {
         id: g.id,
@@ -56,7 +64,7 @@ const App: React.FC = () => {
       };
     });
     setCourseGroups(derived);
-  }, [groupingConfig, courses]);
+  }, [groupingConfig, courses, selectedFaculty]);
 
   // ---------- Settings Persistence (IPC) ----------
   // ساخت UserPreferences از آرایه preferences موجود (الگوی ساده استخراج)
@@ -151,7 +159,6 @@ const App: React.FC = () => {
   // Grouping configuration state
   // groupingConfig managed by scheduling hook
   const [showGroups, setShowGroups] = useState(false); // overlay modal
-  const [selectedFaculty, setSelectedFaculty] = useState<string | null>(null); // prefix-based faculty selection
   const [minUnits, setMinUnits] = useState<number | ''>('');
   const [maxUnits, setMaxUnits] = useState<number | ''>('');
   const [allowSkipping, setAllowSkipping] = useState<boolean>(true);
@@ -685,6 +692,7 @@ const App: React.FC = () => {
               onPreferencesChange={setPreferences}
               weights={prefWeights}
               onWeightsChange={setPrefWeights}
+              selectedFaculty={selectedFaculty}
               onGroupOrderChange={(orderedIds)=>{
                 // Map ordered IDs to new priorities: first -> High, next two -> Medium, rest -> Low (保持 منطق قبلی تقریبی)
                 setCourseGroups(prev => {

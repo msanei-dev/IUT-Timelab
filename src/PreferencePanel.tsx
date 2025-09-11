@@ -50,6 +50,7 @@ interface PreferencePanelProps {
   weights: PreferenceWeights;
   onWeightsChange: (w: PreferenceWeights) => void;
   onGroupOrderChange?: (orderedIds: string[]) => void; // new: notify parent of reordered group IDs
+  selectedFaculty?: string | null; // فیلتر دانشکده انتخابی
 }
 
 const PreferencePanel: React.FC<PreferencePanelProps> = ({ 
@@ -58,7 +59,8 @@ const PreferencePanel: React.FC<PreferencePanelProps> = ({
   onPreferencesChange,
   weights,
   onWeightsChange,
-  onGroupOrderChange
+  onGroupOrderChange,
+  selectedFaculty
 }) => {
   const [groupPrefs, setGroupPrefs] = useState<GroupPreference[]>([]);
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
@@ -87,6 +89,13 @@ const PreferencePanel: React.FC<PreferencePanelProps> = ({
       const timeDefaults: Record<string, number> = {};
       for (const code of g.courseCodes) {
         const course = courseIndex[code]; if (!course) continue;
+        
+        // فیلتر بر اساس دانشکده انتخاب شده
+        const shouldInclude = !selectedFaculty || 
+          (course.courseCode && course.courseCode.toString().startsWith(selectedFaculty));
+        
+        if (!shouldInclude) continue;
+        
         for (const section of course.sections) {
           if (!(section.professor.name in profDefaults)) profDefaults[section.professor.name] = 3;
           for (const slot of section.schedule) {
@@ -105,7 +114,7 @@ const PreferencePanel: React.FC<PreferencePanelProps> = ({
       return { groupId: g.id, groupName: g.name, priority: idx+1, professorRatings: profDefaults, timeSlotRatings: timeDefaults };
     });
     setGroupPrefs(next);
-  }, [courseGroups, courseIndex]);
+  }, [courseGroups, courseIndex, selectedFaculty]);
 
   // Persist group preferences when they change
   useEffect(()=>{
@@ -514,7 +523,21 @@ const PreferencePanel: React.FC<PreferencePanelProps> = ({
                       </svg>
                       امتیاز اساتید:
                     </h4>
-                    {profEntries.map(([profName]) => (
+                    {profEntries
+                      .filter(([profName]) => {
+                        if (!selectedFaculty) return true;
+                        // اگر دانشکده انتخاب شده، فقط استادهایی که در آن دانشکده تدریس می‌کنند نشان داده شوند
+                        for (const code of courseGroups.find(cg => cg.id === gp.groupId)?.courseCodes || []) {
+                          const course = courseIndex[code];
+                          if (course && course.courseCode && course.courseCode.toString().startsWith(selectedFaculty)) {
+                            if (course.sections.some(s => s.professor.name === profName)) {
+                              return true;
+                            }
+                          }
+                        }
+                        return false;
+                      })
+                      .map(([profName]) => (
                       <div key={profName} className="rating-item" style={{ 
                         display: 'flex', 
                         alignItems: 'center', 
@@ -561,7 +584,24 @@ const PreferencePanel: React.FC<PreferencePanelProps> = ({
                       </svg>
                       امتیاز زمان‌بندی:
                     </h4>
-                    {slotEntries.map(([slotKey]) => (
+                    {slotEntries
+                      .filter(([slotKey]) => {
+                        if (!selectedFaculty) return true;
+                        // اگر دانشکده انتخاب شده، فقط زمان‌هایی که در آن دانشکده استفاده می‌شوند نشان داده شوند
+                        for (const code of courseGroups.find(cg => cg.id === gp.groupId)?.courseCodes || []) {
+                          const course = courseIndex[code];
+                          if (course && course.courseCode && course.courseCode.toString().startsWith(selectedFaculty)) {
+                            if (course.sections.some(s => s.schedule.some(slot => {
+                              const key = `${slot.day}-${slot.start}-${slot.end}`;
+                              return key === slotKey;
+                            }))) {
+                              return true;
+                            }
+                          }
+                        }
+                        return false;
+                      })
+                      .map(([slotKey]) => (
                       <div key={slotKey} className="rating-item" style={{ 
                         display: 'flex', 
                         alignItems: 'center', 
