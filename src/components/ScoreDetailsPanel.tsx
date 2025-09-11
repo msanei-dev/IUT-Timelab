@@ -40,7 +40,7 @@ export const ScoreDetailsPanel: React.FC<Props> = ({ open, onClose, schedule, ge
               <div key={r.key} style={{ display:'flex', flexDirection:'column', gap:6, background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.07)', padding:'10px 12px', borderRadius:12 }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                   <span style={{ fontSize:'.75rem', fontWeight:600, color:'var(--text-primary)' }}>{r.label}</span>
-                  <span style={{ fontSize:'.7rem', fontWeight:600, color:'var(--text-secondary)' }}>{value}</span>
+                  <span style={{ fontSize:'.7rem', fontWeight:600, color:'var(--text-secondary)' }}>{Number(value).toFixed(1)}</span>
                 </div>
                 <div style={{ height:6, background:'rgba(255,255,255,0.08)', borderRadius:4, overflow:'hidden' }}>
                   <div style={{ height:'100%', width: Math.min(100, Math.abs(value)/10)+'%', background:r.color || 'var(--accent-color)', filter:'brightness(1.2)' }} />
@@ -52,7 +52,7 @@ export const ScoreDetailsPanel: React.FC<Props> = ({ open, onClose, schedule, ge
         <div style={{ marginTop:18, padding:'14px 16px', border:'1px solid rgba(255,255,255,0.08)', background:'linear-gradient(140deg,rgba(255,255,255,0.06),rgba(255,255,255,0.03))', borderRadius:14 }}>
           <div style={{ display:'flex', justifyContent:'space-between', fontSize:'0.8rem', fontWeight:600, color:'var(--text-primary)' }}>
             <span>امتیاز نهایی</span>
-            <span>{breakdown.total}</span>
+            <span>{Number(breakdown.total).toFixed(1)}</span>
           </div>
         </div>
       </div>

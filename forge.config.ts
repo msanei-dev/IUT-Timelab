@@ -8,8 +8,10 @@ import { WebpackPlugin } from '@electron-forge/plugin-webpack';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 
-import { mainConfig } from './webpack.main.config';
-import { rendererConfig } from './webpack.renderer.config';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { mainConfig } = require('./webpack.main.config');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { rendererConfig } = require('./webpack.renderer.config');
 
 const config: ForgeConfig = {
   packagerConfig: {

@@ -6,7 +6,7 @@ rules.push({
   use: [{ loader: 'style-loader' }, { loader: 'css-loader' }],
 });
 
-module.exports = {
+const rendererConfig = {
   module: {
     rules,
   },
@@ -15,3 +15,5 @@ module.exports = {
     extensions: ['.js', '.ts', '.jsx', '.tsx', '.css'],
   },
 };
+
+module.exports = { rendererConfig };
