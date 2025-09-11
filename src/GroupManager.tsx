@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { CourseGroup as LegacyCourseGroup, GroupingConfig } from './grouping';
 import { CourseGroup } from './shared/types';
 
@@ -17,6 +17,16 @@ const GroupManager: React.FC<Props> = ({ allCourseNames, value, onChange }) => {
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   // حالت پیش‌فرض نمایش: لیست
   const [layoutMode, setLayoutMode] = useState<'grid' | 'list'>('list');
+  const newGroupInputRef = useRef<HTMLInputElement | null>(null);
+  const filterInputRef = useRef<HTMLInputElement | null>(null);
+
+  // فوکوس خودکار هنگام اولین نمایش (پس از انتخاب دانشکده / باز شدن مودال)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      newGroupInputRef.current?.focus();
+    }, 30); // تاخیر کوتاه برای اطمینان از رندر کامل
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => { setGroups(value.groups); }, [value]);
 
@@ -41,6 +51,8 @@ const GroupManager: React.FC<Props> = ({ allCourseNames, value, onChange }) => {
     persist([...groups, { id, name, courseNames: [] }]);
     setNewGroupName('');
     setSelectedGroupId(id);
+  // پس از ایجاد گروه، روی فیلتر فوکوس شود تا تایپ بلافاصله ممکن باشد
+  setTimeout(() => filterInputRef.current?.focus(), 0);
   };
 
   const removeGroup = (id: string) => {
@@ -95,7 +107,26 @@ const GroupManager: React.FC<Props> = ({ allCourseNames, value, onChange }) => {
     <div className="card card-solid" style={containerStyle}>
       <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 600, color:'var(--text-primary)' }}>مدیریت گروه‌ها</h3>
       <div style={{ display: 'flex', gap: '8px' }}>
-        <input value={newGroupName} onChange={e => setNewGroupName(e.target.value)} placeholder="نام گروه جدید" className="form-control" style={{ flex: 1, fontSize: '0.85rem' }} />
+        <input
+          ref={newGroupInputRef}
+          value={newGroupName}
+          onChange={e => setNewGroupName(e.target.value)}
+          placeholder="نام گروه جدید"
+          className="form-control"
+          style={{ flex: 1, fontSize: '0.85rem' }}
+          autoFocus
+          onMouseDown={(e) => {
+            // اجبار فوکوس در شرایطی که کلیک اول بلعیده می‌شود (frameless + drag regions)
+            if (document.activeElement !== e.currentTarget) {
+              e.currentTarget.focus();
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              createGroup();
+            }
+          }}
+        />
         <button onClick={createGroup} className="btn btn-secondary" disabled={!newGroupName.trim()} style={{ fontSize: '0.75rem' }}>ایجاد</button>
       </div>
       <div style={{ display:'flex', gap:'12px', alignItems:'stretch', minHeight: '320px', flex:1, overflow:'hidden' }}>
@@ -115,9 +146,10 @@ const GroupManager: React.FC<Props> = ({ allCourseNames, value, onChange }) => {
                   alignItems:'center',
                   justifyContent:'space-between',
                   gap:8,
-                  transition:'background 120ms'
+                  transition:'background 120ms',
+                  userSelect:'none'
                 }}
-                onClick={() => setSelectedGroupId(g.id)}
+                onClick={() => { setSelectedGroupId(g.id); setTimeout(()=>filterInputRef.current?.focus(), 0); }}
               >
                 <div style={{ fontSize:'0.82rem', fontWeight:600, display:'flex', flexDirection:'column', flex:1, color:'var(--text-primary)' }}>
                   <span style={{ lineHeight:1.2, color:'var(--text-primary)' }}>{g.name}</span>
@@ -220,7 +252,7 @@ const GroupManager: React.FC<Props> = ({ allCourseNames, value, onChange }) => {
                   >لیست</button>
                 </div>
               </div>
-              <input value={filter} onChange={e => setFilter(e.target.value)} placeholder="جستجو سریع درس..." className="form-control" style={{ fontSize:'0.75rem' }} />
+              <input ref={filterInputRef} value={filter} onChange={e => setFilter(e.target.value)} placeholder="جستجو سریع درس..." className="form-control" style={{ fontSize:'0.75rem' }} />
               <div style={{ fontSize:'0.58rem', color:'var(--text-secondary)', display:'flex', justifyContent:'space-between', padding:'0 4px' }}>
                 <span>روی یک درس کلیک کنید تا به گروه اضافه/حذف شود.</span>
                 <span style={{ direction:'ltr' }}>اسکرول ↑↓</span>
