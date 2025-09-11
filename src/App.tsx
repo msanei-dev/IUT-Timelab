@@ -747,16 +747,17 @@ const App: React.FC = () => {
                   color:'#fff',
                   fontSize:12,
                   fontWeight:600,
-                  padding:'10px 16px',
+                  padding:'8px 16px',
                   borderRadius:10,
                   cursor:'pointer',
                   display:'flex',
                   alignItems:'center',
                   gap:6,
-                  boxShadow:'0 4px 14px -4px rgba(79,70,229,0.6)'
+                  boxShadow:'0 4px 14px -4px rgba(79,70,229,0.6)',
+                  height:'40px'
                 }}
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2">
                   <circle cx="12" cy="12" r="10"/>
                   <path d="M12 8v4"/>
                   <path d="M12 16h.01"/>

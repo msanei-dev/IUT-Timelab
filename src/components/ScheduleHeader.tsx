@@ -34,12 +34,16 @@ export const ScheduleHeader: React.FC<Props> = ({ schedules, currentIdx, setCurr
           padding: '8px 16px',
           fontSize: '0.9rem',
           fontWeight: '600',
-          color: 'var(--text-primary)',
+          color: '#fff',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: '8px',
+          height: '40px',
+          background: 'linear-gradient(140deg, rgba(22,27,36,0.92), rgba(22,27,36,0.78))',
+          border: '1px solid rgba(255,255,255,0.12)',
+          borderRadius: '10px'
         }}>
-          <svg className="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg className="icon-sm" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2">
             <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
           </svg>
           امتیاز: {Number(schedules[currentIdx].score).toFixed(1)}

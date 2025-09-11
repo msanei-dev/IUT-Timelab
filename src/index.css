@@ -72,6 +72,10 @@
   /* Toggle */
   --toggle-bg: #e2e8f0;
   --toggle-indicator: #ffffff;
+
+  /* Gradients (used by badges/buttons/counters) */
+  --primary-gradient: linear-gradient(135deg, #2563eb, #1d4ed8);
+  --secondary-gradient: linear-gradient(135deg, #64748b, #475569);
 }
 
 /* Dark theme */
@@ -96,6 +100,9 @@
   --shadow-lg: 0 12px 28px -6px rgba(0,0,0,0.6);
   --toggle-bg: #243042;
   --toggle-indicator: linear-gradient(135deg,#3d6bff,#274088);
+  /* Dark gradients */
+  --primary-gradient: linear-gradient(135deg, rgba(59,130,246,0.9), rgba(29,78,216,0.92));
+  --secondary-gradient: linear-gradient(135deg, rgba(100,116,139,0.9), rgba(71,85,105,0.92));
   /* Glass gradients */
   --glass-gradient: linear-gradient(145deg, rgba(0,0,0,0.78) 0%, rgba(12,16,22,0.62) 45%, rgba(20,26,34,0.38) 70%, rgba(30,38,48,0.18) 100%);
   --glass-border: rgba(255,255,255,0.08);
