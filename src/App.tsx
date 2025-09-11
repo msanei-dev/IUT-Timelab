@@ -738,12 +738,32 @@ const App: React.FC = () => {
         {(gaSchedules ? gaSchedules : schedules).length > 0 ? (
           <>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12 }}>
-              <ScheduleHeader
-                schedules={(gaSchedules? gaSchedules : schedules) as any}
-                currentIdx={currentIdx}
-                setCurrentIdx={setCurrentIdx}
-                onShowScoreDetails={()=>setShowScoreDetails(true)}
-              />
+              <ScheduleHeader schedules={(gaSchedules? gaSchedules : schedules) as any} currentIdx={currentIdx} setCurrentIdx={setCurrentIdx} />
+              <button
+                onClick={()=>setShowScoreDetails(true)}
+                style={{
+                  background:'linear-gradient(90deg,#6366f1,#4f46e5)',
+                  border:'1px solid rgba(255,255,255,0.15)',
+                  color:'#fff',
+                  fontSize:12,
+                  fontWeight:600,
+                  padding:'8px 16px',
+                  borderRadius:10,
+                  cursor:'pointer',
+                  display:'flex',
+                  alignItems:'center',
+                  gap:6,
+                  boxShadow:'0 4px 14px -4px rgba(79,70,229,0.6)',
+                  height:'40px'
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <path d="M12 8v4"/>
+                  <path d="M12 16h.01"/>
+                </svg>
+                جزئیات امتیاز
+              </button>
             </div>
             <div style={{ flex: 1, marginBottom: '24px' }}>
               <CalendarView schedule={(gaSchedules? gaSchedules : schedules)[currentIdx]} />

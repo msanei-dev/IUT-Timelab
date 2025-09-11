@@ -73,7 +73,7 @@
   --toggle-bg: #e2e8f0;
   --toggle-indicator: #ffffff;
 
-  /* Gradients (used by badges/buttons/counters) */
+  /* Gradients */
   --primary-gradient: linear-gradient(135deg, #2563eb, #1d4ed8);
   --secondary-gradient: linear-gradient(135deg, #64748b, #475569);
 }
