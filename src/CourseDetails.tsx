@@ -7,7 +7,9 @@ interface Props {
 }
 
 const CourseDetails: React.FC<Props> = ({ courses, activeCourseCodes }) => {
-  if (!courses || !courses.courses) return null;
+  // قبلاً اگر courses به صورت آرایه (فرمت هوک useCourseData) بود به خاطر نبودن courses.courses مقدار null برمی‌گشت و هیچ چیزی نمایش داده نمی‌شد.
+  // این گارد را اصلاح می‌کنیم تا هم آرایه و هم آبجکت { courses: [...] } را پشتیبانی کند.
+  if (!courses) return null;
 
   const formatSchedule = (schedule: any[]) => {
     if (!schedule || schedule.length === 0) return 'زمان‌بندی نامشخص';
@@ -29,8 +31,14 @@ const CourseDetails: React.FC<Props> = ({ courses, activeCourseCodes }) => {
 
   // Filter by active groups if activeCourseCodes provided
   const courseList = Array.isArray(courses) ? courses : courses.courses;
-  const filtered = Array.isArray(activeCourseCodes) && activeCourseCodes.length
-    ? courseList.filter((c: any) => activeCourseCodes.includes(c.courseCode))
+
+  const activeProvided = typeof activeCourseCodes !== 'undefined';
+  const activeSet = new Set(
+    (activeCourseCodes || []).map(c => c != null ? String(c) : '')
+  );
+
+  const filtered = activeProvided
+    ? (activeSet.size === 0 ? [] : courseList.filter((c: any) => activeSet.has(String(c.courseCode))))
     : courseList;
 
   return (
@@ -56,7 +64,12 @@ const CourseDetails: React.FC<Props> = ({ courses, activeCourseCodes }) => {
         overflowY: 'auto',
         fontSize: '13px'
       }}>
-  {filtered.map((course: any, idx: number) => (
+  {activeProvided && activeSet.size===0 && (
+        <div style={{ fontSize:'12px', color:'var(--text-secondary)', textAlign:'center', padding:'12px' }}>
+          هیچ درسی انتخاب نشده است.
+        </div>
+      )}
+      {filtered.map((course: any, idx: number) => (
           <div key={idx} style={{
             marginBottom: '16px',
             padding: '12px',

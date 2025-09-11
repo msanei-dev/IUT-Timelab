@@ -1153,6 +1153,17 @@ button:not(.btn):not(.btn-modern):hover {
   z-index: 999;
 }
 
+/* جلوگیری از مشکل فوکوس در نسخه بسته‌بندی (make) روی Windows:
+   چون کل نوار بالایی drag است، مطمئن می‌شویم تمامی المان‌های تعاملی no-drag باشند */
+input, textarea, select, button, [contenteditable="true"], .form-control, .card, .btn, label {
+  -webkit-app-region: no-drag;
+}
+
+/* کانتینر اصلی اپ نیز نباید قابل درگ باشد */
+#root, body, html {
+  -webkit-app-region: no-drag;
+}
+
 /* Dark theme for title bar */
 :root[data-theme='dark'] .titlebar {
   background: #1f2937;

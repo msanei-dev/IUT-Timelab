@@ -10,16 +10,20 @@ if (require('electron-squirrel-startup')) {
 }
 
 const createWindow = (): void => {
+  const isMac = process.platform === 'darwin';
   const mainWindow = new BrowserWindow({
     height: 800,
     width: 1200,
-    frame: false, // custom chrome
-    titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 14, y: 14 } as any, // macOS only safe-guard
+    frame: false,
+    titleBarStyle: isMac ? 'hiddenInset' : 'hidden', // روی ویندوز hiddenInset گاهی باعث ناحیه کشیده بزرگ می‌شود
+    trafficLightPosition: isMac ? { x: 14, y: 14 } as any : undefined,
+    backgroundColor: '#12171e',
+    transparent: false,
     webPreferences: {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
       nodeIntegration: false,
-      contextIsolation: true
+      contextIsolation: true,
+      spellcheck: false
     },
   });
 
@@ -62,8 +66,10 @@ ipcMain.handle('save-data', async (_event, newData: any) => {
     const fs = require('fs');
     const path = require('path');
     
-    // مسیر فایل data.json
-    const dataPath = path.join(__dirname, 'data.json');
+  // مسیر فایل data.json در پوشه کاربر (خارج از asar)
+  const dataPath = path.join(app.getPath('userData'), 'data.json');
+  // اطمینان از وجود پوشه
+  fs.mkdirSync(path.dirname(dataPath), { recursive: true });
     
     // اگر داده‌های جدید خالی باشه، فایل رو پاک کن
     if (!newData.courses || newData.courses.length === 0) {
@@ -73,7 +79,7 @@ ipcMain.handle('save-data', async (_event, newData: any) => {
     }
     
     // جایگزین کامل داده‌ها (بدون ادغام)
-    fs.writeFileSync(dataPath, JSON.stringify(newData, null, 2), 'utf-8');
+  fs.writeFileSync(dataPath, JSON.stringify(newData, null, 2), 'utf-8');
     
     return { success: true, message: 'Data saved successfully' };
   } catch (error) {
@@ -133,7 +139,9 @@ ipcMain.handle('process-excel-data', async (_event, fileBuffer: number[]) => {
     // ذخیره در فایل data.json
     const fs = require('fs');
     const path = require('path');
-    const dataPath = path.join(__dirname, 'data.json');
+  // ذخیره در مسیر userData تا در بیلد نهایی قابل نوشتن باشد
+  const dataPath = path.join(app.getPath('userData'), 'data.json');
+  fs.mkdirSync(path.dirname(dataPath), { recursive: true });
     const dataToSave = { courses: courses };
     
     fs.writeFileSync(dataPath, JSON.stringify(dataToSave, null, 2), 'utf-8');

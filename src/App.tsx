@@ -717,13 +717,37 @@ const App: React.FC = () => {
           </div>
         ) : (
           <div className="card" style={{ padding: '16px' }}>
-            <CourseDetails 
-              courses={courses} 
-              activeCourseCodes={courseGroups
-                .filter(g=>g.isActive)
-                .flatMap(g=>g.courseCodes)
-                .filter(code => (courses||[]).some(c=>c.courseCode===code && c.sections && c.sections.length>0))}
-            />
+            {(() => {
+              // 1) کدهای گروه‌های فعال (همان منبع اصلی محدودیت‌ها)
+              const activeGroupCodes = Array.from(new Set(
+                courseGroups
+                  .filter(g=>g.isActive)
+                  .flatMap(g=>g.courseCodes)
+                  .filter(code => (courses||[]).some(c=>c.courseCode===code && c.sections && c.sections.length>0))
+                  .map(c=>String(c))
+              ));
+
+              // 2) کد درس‌های انتخاب‌شده (CourseSelector) بر اساس ۷ رقم اول نمایش
+              const selectedCourseCodes = Array.from(new Set(
+                selected.map(dn => {
+                  const m = dn.match(/^(\d{7})/); return m? m[1] : null;
+                }).filter(Boolean) as string[]
+              ));
+
+              // 3) منطق انتخاب نهایی:
+              // اگر کاربر درس انتخاب کرده باشد → اشتراک انتخاب‌ها با گروه‌های فعال (برای جلوگیری از نمایش درس خارج از گروه‌ها)
+              // اگر اشتراک خالی شد ولی کاربر انتخاب داشته → خود انتخاب‌ها (تا کاربر پیام خالی نبیند)
+              // اگر هیچ انتخابی نباشد → همه کدهای گروه‌های فعال
+              let effective: string[] = [];
+              if (selectedCourseCodes.length) {
+                const intersection = selectedCourseCodes.filter(code => activeGroupCodes.includes(code));
+                effective = intersection.length ? intersection : selectedCourseCodes; 
+              } else {
+                effective = activeGroupCodes;
+              }
+
+              return <CourseDetails courses={courses} activeCourseCodes={effective} />;
+            })()}
           </div>
         )}
       </div>
