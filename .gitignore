@@ -67,6 +67,9 @@ app/build/
 tmp/
 temp/
 
+# Office temporary files
+~$*
+
 # Lock files (choose one based on your package manager)
 # package-lock.json
 # yarn.lock

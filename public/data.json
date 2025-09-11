@@ -14,7 +14,8 @@
           },
           "schedule": [
             { "day": "Saturday", "start": "10:00", "end": "12:00" },
-            { "day": "Monday", "start": "10:00", "end": "12:00" }
+            { "day": "Monday", "start": "10:00", "end": "12:00" },
+            { "day": "Wednesday", "start": "11:00", "end": "12:00" }
           ]
         },
         {
@@ -26,7 +27,21 @@
           },
           "schedule": [
             { "day": "Sunday", "start": "10:00", "end": "12:00" },
-            { "day": "Tuesday", "start": "10:00", "end": "12:00" }
+            { "day": "Tuesday", "start": "10:00", "end": "12:00" },
+            { "day": "Wednesday", "start": "09:00", "end": "10:00" }
+          ]
+        },
+        {
+          "sectionCode": "03",
+          "professor": {
+            "name": "پرنيان حسين",
+            "takesAttendance": false,
+            "teachingQuality": "average"
+          },
+          "schedule": [
+            { "day": "Sunday", "start": "15:00", "end": "17:00" },
+            { "day": "Tuesday", "start": "15:00", "end": "17:00" },
+            { "day": "Wednesday", "start": "15:00", "end": "16:00" }
           ]
         }
       ]
@@ -46,6 +61,82 @@
           "schedule": [
             { "day": "Wednesday", "start": "14:00", "end": "16:00" },
             { "day": "Monday", "start": "08:00", "end": "10:00" }
+          ]
+        }
+      ]
+    }
+    ,
+    {
+      "courseName": "ترموديناميك 1",
+      "courseCode": "1514210",
+      "units": 3,
+      "sections": [
+        {
+          "sectionCode": "01",
+          "professor": {
+            "name": "سليم پور محمدرضا",
+            "takesAttendance": false,
+            "teachingQuality": "average"
+          },
+          "schedule": [
+            { "day": "Saturday", "start": "13:00", "end": "14:30" },
+            { "day": "Monday",   "start": "13:00", "end": "14:30" }
+          ]
+        },
+        {
+          "sectionCode": "02",
+          "professor": {
+            "name": "بلاغي اينالو حسين",
+            "takesAttendance": false,
+            "teachingQuality": "average"
+          },
+          "schedule": [
+            { "day": "Sunday",  "start": "13:00", "end": "14:30" },
+            { "day": "Tuesday", "start": "13:00", "end": "14:30" }
+          ]
+        },
+        {
+          "sectionCode": "03",
+          "professor": {
+            "name": "رضايي مجيد",
+            "takesAttendance": false,
+            "teachingQuality": "average"
+          },
+          "schedule": [
+            { "day": "Sunday",  "start": "15:00", "end": "16:30" },
+            { "day": "Tuesday", "start": "15:00", "end": "16:30" }
+          ]
+        }
+      ]
+    }
+    ,
+    {
+      "courseName": "ديناميك",
+      "courseCode": "1518243",
+      "units": 3,
+      "sections": [
+        {
+          "sectionCode": "01",
+          "professor": {
+            "name": "سلماني تهراني مهدي",
+            "takesAttendance": false,
+            "teachingQuality": "average"
+          },
+          "schedule": [
+            { "day": "Saturday", "start": "10:00", "end": "11:30" },
+            { "day": "Monday",   "start": "10:00", "end": "11:30" }
+          ]
+        },
+        {
+          "sectionCode": "02",
+          "professor": {
+            "name": "سلماني تهراني مهدي",
+            "takesAttendance": false,
+            "teachingQuality": "average"
+          },
+          "schedule": [
+            { "day": "Saturday", "start": "13:00", "end": "14:30" },
+            { "day": "Monday",   "start": "13:00", "end": "14:30" }
           ]
         }
       ]
