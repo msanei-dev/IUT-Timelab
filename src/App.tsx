@@ -35,24 +35,45 @@ const App: React.FC = () => {
   const lastSavedRef = useRef<string>('');
   // Modal to show full course list (CourseSelector) instead of inline massive list
   const [showCourseBrowser, setShowCourseBrowser] = useState(false);
+  const [showIncludedCodes, setShowIncludedCodes] = useState(false); // نمایش کدهای شرکت داده‌شده
+  // مجموعه سکشن های حذف‌شده از محاسبه (courseCode_sectionCode) فقط بر اساس دروس داخل گروه‌های کاربر
+  const [excludedSections, setExcludedSections] = useState<Set<string>>(()=>{
+    try { const raw = localStorage.getItem('excludedSections_v1'); if (raw) return new Set(JSON.parse(raw)); } catch {}
+    return new Set();
+  });
+  const toggleExcludeSection = (sectionKey: string) => {
+    setExcludedSections(prev => {
+      const next = new Set(prev);
+      if (next.has(sectionKey)) next.delete(sectionKey); else next.add(sectionKey);
+      return next;
+    });
+  };
+  const clearExclusions = () => setExcludedSections(new Set());
+  useEffect(()=>{ try { localStorage.setItem('excludedSections_v1', JSON.stringify(Array.from(excludedSections))); } catch {} }, [excludedSections]);
   const { schedules, currentIdx, setCurrentIdx, loading, groupingConfig, setGroupingConfig, options, setOptions, generate } = useScheduling({ groups: [] });
   const [preferences, setPreferences] = useState<any[]>([]);
   // Faculty filter (prefix-based) should be available before syncing effect uses it
   const [selectedFaculty, setSelectedFaculty] = useState<string | null>(null);
   // همگام سازی بین GroupManager (groupingConfig) و مدل جدید CourseGroup
+  // بازسازی courseGroups از groupingConfig بدون وابستگی به selectedFaculty
+  // قبلاً فیلتر بر اساس selectedFaculty باعث حذف درس‌های گروه‌های دیگر دانشکده‌ها می‌شد.
+  // حالا همه دروس (دارای سکشن) که نامشان در گروه است نگه داشته می‌شود و تغییر دانشکده فقط روی UI انتخاب تاثیر دارد.
   useEffect(()=>{
     if (!courses) return;
     const legacy = groupingConfig.groups || [];
+    // اگر legacy خالی است و ما قبلاً گروه ذخیره‌شده داریم، بازنویسی نکن
+    if (!legacy.length && courseGroups.length) {
+      console.debug('[groups-sync] skipping overwrite; persisted groups kept');
+      return;
+    }
+    if (!legacy.length) return; // هیچ چیزی برای ساختن نیست
     const prevMap: Record<string, CourseGroup> = {};
     for (const g of courseGroups) prevMap[g.id] = g;
     const derived: CourseGroup[] = legacy.map((g, idx) => {
       const codes: string[] = [];
       courses.forEach(c => {
-        // Only include course codes for selected faculty (by prefix) when a faculty is chosen
-        const inSelectedFaculty = !selectedFaculty || (c.courseCode && c.courseCode.toString().startsWith(selectedFaculty));
-        // Only include courses that have at least one section (selectable)
         const hasSections = Array.isArray(c.sections) && c.sections.length > 0;
-        if (inSelectedFaculty && hasSections && g.courseNames.includes(c.courseName)) {
+        if (hasSections && g.courseNames.includes(c.courseName)) {
           codes.push(c.courseCode);
         }
       });
@@ -66,12 +87,70 @@ const App: React.FC = () => {
       };
     });
     setCourseGroups(derived);
-  }, [groupingConfig, courses, selectedFaculty]);
+  }, [groupingConfig, courses]);
 
   // ---------- Settings Persistence (IPC) ----------
   // ساخت UserPreferences از آرایه preferences موجود (الگوی ساده استخراج)
   const defaultWeights: PreferenceWeights = { professor:50, timeSlot:50, freeDay:50, compactness:50 };
   const [prefWeights, setPrefWeights] = useState<PreferenceWeights>(defaultWeights);
+  // Export / Import preferences modal state
+  const [showPrefIO, setShowPrefIO] = useState(false);
+  const [prefJSON, setPrefJSON] = useState('');
+  const [prefIOMode, setPrefIOMode] = useState<'export'|'import'>('export');
+  const buildPreferencesSnapshot = () => {
+    // raw stored group preferences
+    let raw: any[] = [];
+    try { const r = localStorage.getItem('groupPreferencesV1'); if (r) raw = JSON.parse(r); } catch {}
+    let removed: Record<string, boolean> = {};
+    try { const r = localStorage.getItem('removedProfessors_v1'); if (r) removed = JSON.parse(r) || {}; } catch {}
+    return {
+      type: 'smart-scheduler-preferences',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      courseGroups, // for context
+      groupPreferences: raw,
+      removedProfessors: removed,
+      weights: prefWeights
+    };
+  };
+  const openExportPreferences = () => {
+    setPrefIOMode('export');
+    setPrefJSON(JSON.stringify(buildPreferencesSnapshot(), null, 2));
+    setShowPrefIO(true);
+  };
+  const openImportPreferences = () => {
+    setPrefIOMode('import');
+    setPrefJSON('');
+    setShowPrefIO(true);
+  };
+  const handleImportPreferences = () => {
+    try {
+      const parsed = JSON.parse(prefJSON);
+      if (parsed?.type !== 'smart-scheduler-preferences') { alert('نوع JSON معتبر نیست'); return; }
+      // basic merge/replace
+      if (Array.isArray(parsed.groupPreferences)) {
+        try { localStorage.setItem('groupPreferencesV1', JSON.stringify(parsed.groupPreferences)); } catch {}
+      }
+      if (parsed.removedProfessors && typeof parsed.removedProfessors === 'object') {
+        try { localStorage.setItem('removedProfessors_v1', JSON.stringify(parsed.removedProfessors)); } catch {}
+      }
+      if (parsed.weights) {
+        setPrefWeights((w)=> ({
+          professor: parsed.weights.professor ?? w.professor,
+            timeSlot: parsed.weights.timeSlot ?? w.timeSlot,
+            freeDay: parsed.weights.freeDay ?? w.freeDay,
+            compactness: parsed.weights.compactness ?? w.compactness
+        }));
+      }
+      // Force re-hydrate preferences by triggering setPreferences from freshly read localStorage through PreferencePanel re-render.
+      // Simplest: bump a key in PreferencePanel by adjusting courseGroups reference (no structural change)
+      setCourseGroups([...courseGroups]);
+      alert('وارد شد');
+      setShowPrefIO(false);
+    } catch (e:any) {
+      alert('خطا در خواندن JSON: ' + e.message);
+    }
+  };
   const buildUserPreferences = (): UserPreferences => {
     const preferredProfessorsSet = new Set<string>();
     const timeSlotScores: Record<string, number> = {};
@@ -152,6 +231,8 @@ const App: React.FC = () => {
   const [gaSchedules, setGASchedules] = useState<any[] | null>(null);
   const [showScoreDetails, setShowScoreDetails] = useState(false);
   const [activeTab, setActiveTab] = useState<'courses' | 'preferences' | 'details'>('courses');
+  const [showScheduleNote, setShowScheduleNote] = useState(false);
+  const [scheduleNoteText, setScheduleNoteText] = useState('');
   // Theme (light/dark)
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     try {
@@ -190,9 +271,54 @@ const App: React.FC = () => {
       const minU = minUnits === '' ? 0 : Number(minUnits);
       const maxU = maxUnits === '' ? Infinity : Number(maxUnits || Infinity);
       const userPrefsFull = buildUserPreferences();
+      // اگر فیلتر دانشکده در PreferencePanel اعمال شده باشد (با توجه به selectedFaculty)،
+      // preferences فقط شامل اساتید مجاز می‌شود. برای جلوگیری از انتخاب سکشن‌هایی با استاد خارج از prefs،
+      // سکشن‌های آن اساتید را حذف می‌کنیم (soft-filter) تا GA سراغشان نرود.
+  let filteredCourses = courses;
+      if (selectedFaculty && preferences && preferences.length) {
+        // ساخت نگاشت courseCode -> مجموعه اساتید مجاز
+        const allowedProfByCourse: Record<string, Set<string>> = {};
+        for (const p of preferences) {
+          const names = Object.keys(p.professorRatings || {});
+          allowedProfByCourse[p.courseCode] = new Set(names);
+        }
+        filteredCourses = filteredCourses.map(c => {
+          const allowed = allowedProfByCourse[String(c.courseCode)];
+          if (!allowed) return c; // بدون تنظیم؛ نمی‌بُریم
+          const kept = c.sections.filter((s: any) => allowed.has(s.professor.name));
+          return { ...c, sections: kept }; // اگر kept خالی شد یعنی آن درس فعلاً انتخاب‌پذیر نیست
+        });
+      }
+      // حذف سکشن‌های اساتید حذف‌شده (removedProfessors_v1)
+      try {
+        const rawRemoved = localStorage.getItem('removedProfessors_v1');
+        if (rawRemoved) {
+          const removedMap: Record<string, boolean> = JSON.parse(rawRemoved) || {};
+          if (removedMap && Object.keys(removedMap).length) {
+            filteredCourses = filteredCourses.map(c => {
+              const keptSecs = c.sections.filter((s:any)=> !removedMap[s.professor?.name]);
+              return { ...c, sections: keptSecs };
+            }).filter(c => c.sections.length>0);
+          }
+        }
+      } catch {}
+      // اعمال حذف سکشن‌ها (excludedSections)
+      if (excludedSections.size) {
+        filteredCourses = filteredCourses.map(c => {
+          const kept = c.sections.filter((s:any)=> !excludedSections.has(`${c.courseCode}_${s.sectionCode}`));
+          return { ...c, sections: kept };
+        }).filter(c => c.sections.length>0); // حذف درس‌های بدون سکشن باقی‌مانده
+      }
+      // بررسی اینکه بعد از فیلتر، هر گروه فعال حداقل یک گزینه دارد
+      const courseCodeSet = new Set(filteredCourses.map(c=>String(c.courseCode)));
+      const emptyGroup = activeGroups.find(g => !g.courseCodes.some(code=> courseCodeSet.has(String(code))));
+      if (emptyGroup) {
+        alert(`گروه "${emptyGroup.name}" بعد از حذف اساتید یا سکشن‌ها خالی شد. برخی اساتید حذف‌شده تمام گزینه‌های این گروه را پوشش می‌دهند.`);
+        return;
+      }
   const gaResult = runGenetic({
         courseGroups: activeGroups,
-        courses,
+        courses: filteredCourses,
         preferences,
         userPreferences: userPrefsFull,
         minUnits: minU,
@@ -409,6 +535,80 @@ const App: React.FC = () => {
 
   const toggleTheme = () => setTheme(t => t==='dark' ? 'light' : 'dark');
 
+  // فرمت متنی برنامه برای کپی در یادداشت / پیام
+  const buildScheduleText = (scheduleObj: any) => {
+    if (!scheduleObj) return '';
+    const dayMap: Record<string,string> = { Saturday:'شنبه', Sunday:'یکشنبه', Monday:'دوشنبه', Tuesday:'سه‌شنبه', Wednesday:'چهارشنبه', Thursday:'پنج‌شنبه', Friday:'جمعه' };
+    const lines: string[] = [];
+    lines.push('برنامه هفتگی');
+    lines.push('==============================');
+    const sections = scheduleObj.sections || scheduleObj; // GA vs legacy shape
+    // گروه بندی بر اساس روز
+    const byDay: Record<string, any[]> = {};
+    for (const sec of sections) {
+      for (const slot of sec.schedule) {
+        (byDay[slot.day] = byDay[slot.day] || []).push({
+          course: sec.courseName,
+          code: sec.courseCode,
+          section: sec.sectionCode,
+            professor: sec.professor?.name || '',
+          start: slot.start,
+          end: slot.end
+        });
+      }
+    }
+    const order = ['Saturday','Sunday','Monday','Tuesday','Wednesday','Thursday','Friday'];
+    for (const d of order) {
+      const arr = byDay[d];
+      if (!arr || !arr.length) continue;
+      lines.push(`\n${dayMap[d]}`);
+      lines.push('-'.repeat(12));
+      // sort by start time
+      arr.sort((a,b)=> a.start.localeCompare(b.start));
+      for (const it of arr) {
+        lines.push(`${it.start}-${it.end} | ${it.course} (${it.code}) گروه ${it.section} - ${it.professor}`.trim());
+      }
+    }
+    lines.push('\nمجموع واحد: ' + sections.reduce((s:any,c:any)=>{
+      const found = courses.find(cc=>cc.courseCode===c.courseCode); return s + (found?.units||0);
+    },0));
+    return lines.join('\n');
+  };
+
+  const openScheduleNote = () => {
+    const list = (gaSchedules? gaSchedules : schedules);
+    if (!list.length) return;
+    const current = list[currentIdx];
+    setScheduleNoteText(buildScheduleText(current));
+    setShowScheduleNote(true);
+  };
+
+  // ----- محدود کردن لیست دروس پاس داده شده به PreferencePanel -----
+  // سناریو: کاربر فقط «مقاومت 1» را انتخاب کرده ولی در ترجیحات همه کدهای مشابه (مثلاً دینامیک) هم ظاهر می‌شوند.
+  // راه‌حل: اگر گروه‌های فعال وجود دارند => فقط درس‌های همان گروه‌های فعال. در غیراینصورت اگر در CourseSelector انتخابی هست => همان انتخاب‌ها.
+  // اگر هیچ‌کدام نبود، همه دروس.
+  const preferenceCourses = React.useMemo(()=>{
+    if (!courses) return [] as any[];
+    // 1) اگر گروه‌های فعال وجود دارند (صرف‌نظر از دانشکده) همان‌ها مبنا شوند
+    const activeGroupCodes = new Set<string>(
+      courseGroups.filter(g=>g.isActive).flatMap(g=>g.courseCodes.map(String))
+    );
+    const courseByCode: Record<string, any> = {};
+    courses.forEach(c => { courseByCode[String(c.courseCode)] = c; });
+    if (activeGroupCodes.size) {
+      return Array.from(activeGroupCodes).map(code => courseByCode[code]).filter(Boolean);
+    }
+    // 2) انتخاب دستی کاربر در CourseSelector
+    const selectedCodes = new Set<string>(selected.map(dn => {
+      const m = dn.match(/^(\d{7})/); return m? m[1]: null;
+    }).filter(Boolean) as string[]);
+    if (selectedCodes.size) {
+      return Array.from(selectedCodes).map(code => courseByCode[code]).filter(Boolean);
+    }
+    // 3) پیش‌فرض همه دروس
+    return courses;
+  }, [courses, courseGroups, selected]);
+
   return (
     <>
       <TitleBar onThemeToggle={toggleTheme} currentTheme={theme} />
@@ -551,6 +751,13 @@ const App: React.FC = () => {
                   onClick={()=>setShowCourseBrowser(true)}
                   disabled={!courseNames.length}
                 >نمایش همه دروس ({courseNames.length})</button>
+                {courseGroups.length>0 && (
+                  <button
+                    className="btn btn-outline"
+                    style={{ fontSize:'11px', fontWeight:600, padding:'6px 10px' }}
+                    onClick={()=>setShowIncludedCodes(true)}
+                  >کدهای شرکت‌داده‌شده</button>
+                )}
               </div>
         {courseGroups.length === 0 ? (
                 <div style={{ fontSize:'11px', color:'var(--text-secondary)', lineHeight:1.6 }}>
@@ -693,8 +900,12 @@ const App: React.FC = () => {
           </div>
         ) : activeTab === 'preferences' ? (
           <div className="card" style={{ padding: '16px' }}>
+            <div style={{display:'flex', gap:8, flexWrap:'wrap', marginBottom:12}}>
+              <button className="btn btn-outline" style={{fontSize:11, padding:'6px 10px'}} onClick={openExportPreferences}>خروجی ترجیحات (JSON)</button>
+              <button className="btn btn-outline" style={{fontSize:11, padding:'6px 10px'}} onClick={openImportPreferences}>ورود ترجیحات (JSON)</button>
+            </div>
             <PreferencePanel
-              courses={courses || []}
+              courses={preferenceCourses}
               courseGroups={courseGroups}
               onPreferencesChange={setPreferences}
               weights={prefWeights}
@@ -774,6 +985,95 @@ const App: React.FC = () => {
           </div>
         </div>
       )}
+      {showPrefIO && (
+        <div className="modal-overlay" style={{zIndex:1000}}>
+          <div className="card" style={{width:'760px', maxWidth:'95vw', maxHeight:'84vh', display:'flex', flexDirection:'column'}}>
+            <button onClick={()=>setShowPrefIO(false)} className="modal-close">بستن</button>
+            <h2 className="modal-title" style={{marginBottom:8}}>{prefIOMode==='export' ? 'خروجی ترجیحات' : 'ورود ترجیحات'}</h2>
+            {prefIOMode==='export' && (
+              <p style={{fontSize:12, margin:'0 0 8px', color:'var(--text-secondary)'}}>این JSON را کپی و برای پشتیبان‌گیری نگه دارید. شامل گروه‌ها، رتبه‌بندی اساتید و زمان‌ها، اساتید حذف‌شده و وزن‌ها است.</p>
+            )}
+            {prefIOMode==='import' && (
+              <p style={{fontSize:12, margin:'0 0 8px', color:'var(--text-secondary)'}}>JSON قبلی را اینجا پیست کنید. داده‌های فعلی جایگزین خواهند شد. قبلش حتماً نسخهٔ فعلی را خروجی بگیرید.</p>
+            )}
+            <textarea value={prefJSON} onChange={e=>setPrefJSON(e.target.value)} style={{flex:1, minHeight:280, fontFamily:'mono,monospace', fontSize:12, direction:'ltr', background:'rgba(0,0,0,0.25)', color:'#e2e8f0', padding:12, border:'1px solid rgba(255,255,255,0.12)', borderRadius:8}} />
+            <div style={{display:'flex', justifyContent:'space-between', marginTop:10, gap:8, flexWrap:'wrap'}}>
+              <div style={{display:'flex', gap:8}}>
+                {prefIOMode==='export' && (
+                  <>
+                    <button className="btn btn-primary" style={{fontSize:12}} onClick={()=>{ navigator.clipboard.writeText(prefJSON); }}>کپی</button>
+                    <button className="btn btn-secondary" style={{fontSize:12}} onClick={()=>{
+                      try {
+                        const blob = new Blob([prefJSON], {type:'application/json'});
+                        const a = document.createElement('a');
+                        a.href = URL.createObjectURL(blob);
+                        a.download = 'preferences-export.json';
+                        a.click();
+                      } catch {}
+                    }}>دانلود</button>
+                  </>
+                )}
+                {prefIOMode==='import' && (
+                  <button className="btn btn-primary" style={{fontSize:12}} onClick={handleImportPreferences}>وارد کردن</button>
+                )}
+              </div>
+              {prefIOMode==='import' && (
+                <button className="btn btn-danger" style={{fontSize:11}} onClick={()=>setPrefJSON('')}>پاک کردن متن</button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      {showIncludedCodes && (
+        <div className="modal-overlay" style={{zIndex:999}}>
+          <div className="card" style={{width:'760px', maxWidth:'94vw', maxHeight:'82vh', display:'flex', flexDirection:'column'}}>
+            <button onClick={()=>setShowIncludedCodes(false)} className="modal-close">بستن</button>
+            <h2 className="modal-title" style={{marginBottom:4}}>سکشن‌های در حال محاسبه</h2>
+            <p style={{fontSize:12, margin:'0 0 10px', color:'var(--text-secondary)'}}>فقط سکشن‌هایی که در گروه‌های شما قرار دارند اینجا آمده‌اند. با حذف یک سکشن، آن سکشن در تولید برنامه نادیده گرفته می‌شود.</p>
+            <div style={{display:'flex', gap:8, flexWrap:'wrap', marginBottom:12}}>
+              <button onClick={clearExclusions} className="btn btn-secondary" style={{fontSize:11, padding:'4px 10px'}}>لغو همه حذف‌ها</button>
+              <span style={{fontSize:11, color:'var(--text-secondary)'}}>تعداد حذف شده: {excludedSections.size}</span>
+            </div>
+            <div style={{overflow:'auto', flex:1}}>
+              {courseGroups.map(g => {
+                const groupCourseObjs = g.courseCodes.map(code=> courses.find(c=>c.courseCode===code)).filter(Boolean) as any[];
+                if (!groupCourseObjs.length) return null;
+                return (
+                  <div key={g.id} style={{marginBottom:28}}>
+                    <h3 style={{fontSize:13, fontWeight:600, margin:'0 0 10px', color:'#e2e8f0'}}>{g.name}</h3>
+                    <div className="sections-grid">
+                      {groupCourseObjs.flatMap(co => co.sections.map((s:any)=> ({ key:`${co.courseCode}_${s.sectionCode}`, section:s, course:co }))).map(obj => {
+                        const excluded = excludedSections.has(obj.key);
+                        const times = obj.section.schedule.map((sl:any)=> `${sl.day?.slice(0,2)} ${sl.start}`).join(' | ');
+                        return (
+                          <div key={obj.key} className={`section-card ${excluded? 'excluded':''}`}>
+                            <div className="accent-bar" />
+                            {excluded && <div className="section-badge">حذف‌شده</div>}
+                            <button className="section-remove-btn" onClick={()=>toggleExcludeSection(obj.key)}>
+                              {excluded? 'بازگردانی':'حذف'}
+                            </button>
+                            <div className="top-row">
+                              <span className="code-pill">{obj.key}</span>
+                            </div>
+                            <div className="course-name">{obj.course.courseName}</div>
+                            <div className="section-meta">
+                              <span className="prof-name">{obj.section.professor?.name || '---'}</span>
+                              <div className="section-times">{times}</div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{display:'flex', justifyContent:'flex-end', gap:8, marginTop:12}}>
+              <button onClick={()=>setShowIncludedCodes(false)} className="btn btn-primary" style={{fontSize:12, padding:'6px 14px'}}>بستن</button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Main Content */}
       <div className="card" style={{
         flex: 1,
@@ -798,6 +1098,31 @@ const App: React.FC = () => {
               rowGap: 8
             }}>
               <ScheduleHeader schedules={(gaSchedules? gaSchedules : schedules) as any} currentIdx={currentIdx} setCurrentIdx={setCurrentIdx} />
+              <button
+                onClick={openScheduleNote}
+                style={{
+                  background: 'linear-gradient(90deg,#6366f1,#4f46e5)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  color: '#fff',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  padding: '8px 14px',
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  height: '40px',
+                  boxShadow: '0 4px 14px -4px rgba(99,102,241,0.45)'
+                }}
+                title="تبدیل برنامه به متن برای کپی"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                </svg>
+                کپی برنامه
+              </button>
               <button
                 onClick={()=>setShowScoreDetails(true)}
                 style={{
@@ -824,7 +1149,7 @@ const App: React.FC = () => {
                 جزئیات امتیاز
               </button>
             </div>
-            <div style={{ flex: 1, marginBottom: '24px' }}>
+            <div style={{ flex: 1, marginBottom: '8px', marginTop: '-4px' }}>
               <CalendarView schedule={(gaSchedules? gaSchedules : schedules)[currentIdx]} />
             </div>
           </>
@@ -883,6 +1208,28 @@ const App: React.FC = () => {
           userPreferences={buildUserPreferences()}
         />
       </div>
+      {showScheduleNote && (
+        <div className="modal-overlay" style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:999 }}>
+          <div className="card" style={{ width:'640px', maxWidth:'90%', maxHeight:'82vh', display:'flex', flexDirection:'column', padding:'20px', gap:12, background:'rgba(17,24,39,0.9)', border:'1px solid rgba(255,255,255,0.12)', borderRadius:16 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <h3 style={{ margin:0, fontSize:'1rem', color:'var(--text-primary)' }}>متن برنامه</h3>
+              <div style={{ display:'flex', gap:8 }}>
+                <button
+                  onClick={()=>{ navigator.clipboard.writeText(scheduleNoteText); }}
+                  style={{ background:'linear-gradient(90deg,#2563eb,#1d4ed8)', color:'#fff', border:'none', padding:'6px 14px', borderRadius:6, cursor:'pointer', fontSize:'.75rem', fontWeight:600 }}
+                >کپی</button>
+                <button onClick={()=>setShowScheduleNote(false)} style={{ background:'rgba(255,255,255,0.1)', color:'#fff', border:'none', padding:'6px 14px', borderRadius:6, cursor:'pointer', fontSize:'.75rem' }}>بستن</button>
+              </div>
+            </div>
+            <textarea
+              value={scheduleNoteText}
+              onChange={e=>setScheduleNoteText(e.target.value)}
+              style={{ flex:1, width:'100%', resize:'vertical', minHeight:'300px', background:'rgba(255,255,255,0.05)', color:'#fff', border:'1px solid rgba(255,255,255,0.15)', borderRadius:8, padding:12, fontFamily:'monospace', fontSize:'0.75rem', direction:'rtl', lineHeight:1.6 }}
+            />
+            <div style={{ textAlign:'left', fontSize:'0.6rem', color:'var(--text-secondary)' }}>می‌توانید متن را ویرایش و سپس کپی کنید.</div>
+          </div>
+        </div>
+      )}
     </div>
     </>
   );

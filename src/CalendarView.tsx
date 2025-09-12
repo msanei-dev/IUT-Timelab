@@ -114,48 +114,16 @@ const CalendarView: React.FC<{schedule: Schedule}> = ({ schedule }) => {
   // Build modern grid
   return (
     <div className="card" style={{
-      flex: 1, 
-      borderRadius: '12px', 
-      padding: '16px', 
-      margin: '16px 0', 
-      animation: 'fadeInUp 0.3s ease',
-      maxHeight: '70vh',
+      flex: 1,
+      borderRadius: '10px',
+      padding: '2px 8px 2px',
+      margin: '0 0 0',
+      animation: 'fadeInUp 0.25s ease',
+      maxHeight: '68vh',
       overflow: 'hidden',
       display: 'flex',
       flexDirection: 'column'
     }}>
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        gap: '8px', 
-        marginBottom: '16px',
-        flexShrink: 0
-      }}>
-        <div style={{
-          padding: '8px',
-          borderRadius: '8px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: 'var(--accent-color)',
-          color: 'white'
-        }}>
-          <svg className="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-            <line x1="16" y1="2" x2="16" y2="6"/>
-            <line x1="8" y1="2" x2="8" y2="6"/>
-            <line x1="3" y1="10" x2="21" y2="10"/>
-          </svg>
-        </div>
-        <h2 style={{ 
-          color: 'var(--text-primary)', 
-          margin: 0, 
-          fontSize: '1.2rem',
-          fontWeight: '600'
-        }}>
-          برنامه هفتگی
-        </h2>
-      </div>
       
       {/* نمای جدید: ستون مستقل برای هر روز با محور زمان کناری */}
       <div style={{
@@ -272,39 +240,7 @@ const CalendarView: React.FC<{schedule: Schedule}> = ({ schedule }) => {
         })}
       </div>
       
-      <div className="legend" style={{
-        marginTop: '12px',
-        padding: '12px',
-        backgroundColor: 'var(--bg-accent)',
-        border: '1px solid var(--border-light)',
-        borderRadius: '8px',
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: '8px',
-        alignItems: 'center'
-      }}>
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '6px',
-          color: 'var(--text-primary)',
-          fontWeight: '600',
-          fontSize: '12px'
-        }}>
-          <svg className="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10"/>
-            <path d="M9,9h0a3,3,0,0,1,6,0c0,2-3,3-3,3"/>
-            <path d="M12,17h0"/>
-          </svg>
-          راهنما:
-        </div>
-        <span style={{ 
-          color: 'var(--text-secondary)',
-          fontSize: '11px'
-        }}>
-          بر روی هر درس کلیک کنید تا کد درس کپی شود
-        </span>
-      </div>
+  {/* Legend removed per user request */}
     </div>
   );
 };

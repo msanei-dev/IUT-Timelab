@@ -65,6 +65,17 @@ const PreferencePanel: React.FC<PreferencePanelProps> = ({
   const [groupPrefs, setGroupPrefs] = useState<GroupPreference[]>([]);
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [facultyFilterEnabled, setFacultyFilterEnabled] = useState<boolean>(true);
+  // نگهداری وضعیت حذف سراسری اساتید (Persisted)
+  const [removedProfessors, setRemovedProfessors] = useState<Record<string, boolean>>(()=>{
+    try { const raw = localStorage.getItem('removedProfessors_v1'); if (raw) return JSON.parse(raw) || {}; } catch {};
+    return {};
+  });
+
+  // Persist removedProfessors
+  useEffect(()=>{
+    try { localStorage.setItem('removedProfessors_v1', JSON.stringify(removedProfessors)); } catch {}
+  }, [removedProfessors]);
 
   // Index courses by code for fast lookup
   const courseIndex = useMemo(()=>{
@@ -83,21 +94,19 @@ const PreferencePanel: React.FC<PreferencePanelProps> = ({
     const storedMap: Record<string, GroupPreference> = {};
     for (const gp of stored) storedMap[gp.groupId] = gp;
 
-    const next: GroupPreference[] = courseGroups.map((g, idx) => {
+  const next: GroupPreference[] = courseGroups.map((g, idx) => {
       // Collect current professors & time slots
       const profDefaults: Record<string, number> = {};
       const timeDefaults: Record<string, number> = {};
       for (const code of g.courseCodes) {
         const course = courseIndex[code]; if (!course) continue;
-        
-        // فیلتر بر اساس دانشکده انتخاب شده
-        const shouldInclude = !selectedFaculty || 
-          (course.courseCode && course.courseCode.toString().startsWith(selectedFaculty));
-        
-        if (!shouldInclude) continue;
-        
+    // دیگر در این مرحله فیلتر دانشکده نمی‌کنیم تا صفر نشود.
         for (const section of course.sections) {
-          if (!(section.professor.name in profDefaults)) profDefaults[section.professor.name] = 3;
+          if (!(section.professor.name in profDefaults)) {
+            // اگر قبلاً حذف شده بود مقدار -1 بدهیم تا پایدار بماند
+            const base = removedProfessors[section.professor.name] ? -1 : 3;
+            profDefaults[section.professor.name] = base;
+          }
           for (const slot of section.schedule) {
             const key = `${slot.day}-${slot.start}-${slot.end}`;
             if (!(key in timeDefaults)) timeDefaults[key] = 3;
@@ -109,12 +118,16 @@ const PreferencePanel: React.FC<PreferencePanelProps> = ({
         // merge in any new professors / time slots with default rating 3
         const mergedProf: Record<string, number> = { ...profDefaults, ...existing.professorRatings };
         const mergedTime: Record<string, number> = { ...timeDefaults, ...existing.timeSlotRatings };
+        // Enforce removedProfessors on merged snapshot
+        for (const profName of Object.keys(mergedProf)) {
+          if (removedProfessors[profName]) mergedProf[profName] = -1;
+        }
         return { ...existing, groupName: g.name, priority: idx+1, professorRatings: mergedProf, timeSlotRatings: mergedTime };
       }
       return { groupId: g.id, groupName: g.name, priority: idx+1, professorRatings: profDefaults, timeSlotRatings: timeDefaults };
     });
     setGroupPrefs(next);
-  }, [courseGroups, courseIndex, selectedFaculty]);
+  }, [courseGroups, courseIndex, removedProfessors]);
 
   // Persist group preferences when they change
   useEffect(()=>{
@@ -126,23 +139,44 @@ const PreferencePanel: React.FC<PreferencePanelProps> = ({
   // Propagate flattened course preferences to parent whenever groupPrefs change
   useEffect(()=>{
     const flattened: CoursePreference[] = [];
-    // group priority: earlier index higher priority (priority field is index+1)
     const ordered = [...groupPrefs].sort((a,b)=>a.priority-b.priority);
+    const facultyActive = facultyFilterEnabled && !!selectedFaculty;
     ordered.forEach((gp, orderIdx) => {
-      for (const group of courseGroups.filter(g=>g.id===gp.groupId)) {
-        for (const code of group.courseCodes) {
-          const course = courseIndex[code]; if (!course) continue;
-          // Filter ratings to only relevant professors/time slots for this course
-          const pr: Record<string, number> = {};
-            course.sections.forEach(sec => { if (gp.professorRatings[sec.professor.name]!=null) pr[sec.professor.name] = gp.professorRatings[sec.professor.name]; });
-          const tr: Record<string, number> = {};
-            course.sections.forEach(sec => sec.schedule.forEach(slot => { const key = `${slot.day}-${slot.start}-${slot.end}`; if (gp.timeSlotRatings[key]!=null) tr[key] = gp.timeSlotRatings[key]; }));
-          flattened.push({ courseCode: course.courseCode, courseName: course.courseName, priority: orderIdx+1, professorRatings: pr, timeSlotRatings: tr });
+      const group = courseGroups.find(g=>g.id===gp.groupId);
+      if (!group) return;
+      const groupCourseCodes = group.courseCodes.map(String);
+      // اگر فیلتر دانشکده فعال است بررسی کنیم که این گروه اصلاً درسی از آن دانشکده دارد
+      const groupHasFacultyCourses = facultyActive ? groupCourseCodes.some(code => code.startsWith(String(selectedFaculty))) : false;
+      let allowedProfessorSet: Set<string> | null = null;
+      if (groupHasFacultyCourses && facultyActive) {
+        allowedProfessorSet = new Set<string>();
+        for (const code of groupCourseCodes) {
+          if (!String(code).startsWith(String(selectedFaculty))) continue;
+            const c = courseIndex[code];
+            if (!c) continue;
+            for (const sec of c.sections) allowedProfessorSet.add(sec.professor.name);
         }
+      }
+      for (const code of groupCourseCodes) {
+        const cObj = courseIndex[code]; if (!cObj) continue;
+        const pr: Record<string, number> = {};
+        cObj.sections.forEach(sec => {
+          const rv = gp.professorRatings[sec.professor.name];
+          if (rv==null || rv === -1) return;
+          // اگر فیلتر فعال است و این گروه دروس دانشکده انتخابی دارد، فقط اساتیدی که در allowedProfessorSet هستند مجازند
+          if (allowedProfessorSet && !allowedProfessorSet.has(sec.professor.name)) return;
+          pr[sec.professor.name] = rv;
+        });
+        const tr: Record<string, number> = {};
+        cObj.sections.forEach(sec => sec.schedule.forEach(slot => {
+          const key = `${slot.day}-${slot.start}-${slot.end}`;
+          if (gp.timeSlotRatings[key]!=null) tr[key] = gp.timeSlotRatings[key];
+        }));
+        flattened.push({ courseCode: cObj.courseCode, courseName: cObj.courseName, priority: orderIdx+1, professorRatings: pr, timeSlotRatings: tr });
       }
     });
     onPreferencesChange(flattened);
-  }, [groupPrefs, courseGroups, courseIndex, onPreferencesChange]);
+  }, [groupPrefs, courseGroups, courseIndex, onPreferencesChange, selectedFaculty, facultyFilterEnabled]);
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedIndex(index);
@@ -172,6 +206,18 @@ const PreferencePanel: React.FC<PreferencePanelProps> = ({
   };
   const updateProfessorRating = (groupId: string, professorName: string, rating: number) => {
     setGroupPrefs(gps => gps.map(g => g.groupId===groupId ? { ...g, professorRatings: { ...g.professorRatings, [professorName]: rating } }: g));
+  };
+
+  const toggleRemoveProfessor = (groupId: string, professorName: string) => {
+    setRemovedProfessors(prev => {
+      const nextRemoved = !prev[professorName];
+      // فوری روی groupPrefs اعمال کنیم تا UI سریع آپدیت شود
+      setGroupPrefs(gps => gps.map(g => {
+        if (!(professorName in g.professorRatings)) return g;
+        return { ...g, professorRatings: { ...g.professorRatings, [professorName]: nextRemoved ? -1 : 3 } };
+      }));
+      return { ...prev, [professorName]: nextRemoved };
+    });
   };
 
   const updateTimeSlotRating = (groupId: string, slotKey: string, rating: number) => {
@@ -397,11 +443,36 @@ const PreferencePanel: React.FC<PreferencePanelProps> = ({
         ))}
       </div>
 
+      {/* Faculty Filter Toggle */}
+      {selectedFaculty && (
+        <div style={{
+          display:'flex',
+          alignItems:'center',
+          gap:8,
+          margin:'0 0 14px 0',
+          background:'rgba(255,255,255,0.04)',
+          padding:'10px 12px',
+          border:'1px solid rgba(255,255,255,0.06)',
+          borderRadius:8,
+          fontSize:'0.7rem'
+        }}>
+          <label style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', fontWeight:600 }}>
+            <input type="checkbox" checked={facultyFilterEnabled} onChange={e=>setFacultyFilterEnabled(e.target.checked)} style={{ accentColor:'#2563eb' }} />
+            <span>اعمال فیلتر دانشکده ({selectedFaculty}) روی نمایش اساتید/زمان‌ها</span>
+          </label>
+          {!facultyFilterEnabled && <span style={{ color:'var(--text-secondary)' }}>همه اساتید و بازه‌ها نمایش داده می‌شوند.</span>}
+        </div>
+      )}
+
       <div className="preferences-list">
         {groupPrefs.sort((a,b)=>a.priority-b.priority).map((gp, index) => {
           // Build dynamic lists for display (professors/time slots) from groupPref state
           const profEntries = Object.entries(gp.professorRatings);
           const slotEntries = Object.entries(gp.timeSlotRatings);
+          // Determine once whether this group actually contains any course belonging to selectedFaculty.
+          // اگر هیچ درس این گروه متعلق به دانشکده انتخابی نباشد، فیلتر دانشکده را برای این گروه بی‌اثر می‌کنیم تا لیست خالی نشود.
+          const groupCourseCodes = courseGroups.find(cg => cg.id === gp.groupId)?.courseCodes || [];
+          const groupHasFacultyCourses = selectedFaculty ? groupCourseCodes.some(code => code.toString().startsWith(selectedFaculty)) : false;
           return (
             <div
               key={gp.groupId}
@@ -525,45 +596,68 @@ const PreferencePanel: React.FC<PreferencePanelProps> = ({
                     </h4>
                     {profEntries
                       .filter(([profName]) => {
-                        if (!selectedFaculty) return true;
-                        // اگر دانشکده انتخاب شده، فقط استادهایی که در آن دانشکده تدریس می‌کنند نشان داده شوند
-                        for (const code of courseGroups.find(cg => cg.id === gp.groupId)?.courseCodes || []) {
+                        // Skip filtering if toggle off, no faculty selected, or this group has no courses for that faculty
+                        if (!facultyFilterEnabled || !selectedFaculty || !groupHasFacultyCourses) return true;
+                        for (const code of groupCourseCodes) {
                           const course = courseIndex[code];
                           if (course && course.courseCode && course.courseCode.toString().startsWith(selectedFaculty)) {
-                            if (course.sections.some(s => s.professor.name === profName)) {
-                              return true;
-                            }
+                            if (course.sections.some(s => s.professor.name === profName)) return true;
                           }
                         }
                         return false;
                       })
-                      .map(([profName]) => (
+                      .map(([profName]) => {
+                        const removed = gp.professorRatings[profName] === -1;
+                        return (
                       <div key={profName} className="rating-item" style={{ 
                         display: 'flex', 
                         alignItems: 'center', 
                         justifyContent: 'space-between',
                         marginBottom: 6,
-                        padding: '8px 10px',
-                        background: 'rgba(255,255,255,0.045)',
+                        padding: '8px 10px', 
+                        background: removed ? 'rgba(220,38,38,0.15)' : 'rgba(255,255,255,0.045)',
                         borderRadius: '6px',
-                        border: '1px solid rgba(255,255,255,0.06)',
+                        border: removed ? '1px solid rgba(248,113,113,0.6)' : '1px solid rgba(255,255,255,0.06)',
                         boxShadow: '0 1px 2px rgba(0,0,0,0.35)'
                       }}>
                         <span style={{ 
                           fontSize: '11.5px', 
-                          color: 'rgba(240,245,255,0.9)',
-                          fontWeight: 500,
+                          color: removed ? '#fca5a5' : 'rgba(240,245,255,0.9)',
+                          fontWeight: removed ? 600 : 500,
                           letterSpacing: '.2px'
                         }}>
-                          {profName}
+                          {profName}{removed && ' (حذف)'}
                         </span>
-                        <StarRating
-                          rating={gp.professorRatings[profName] || 3}
-                          onChange={(rating) => updateProfessorRating(gp.groupId, profName, rating)}
-                          size="16px"
-                        />
+                        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                          {!removed && (
+                            <StarRating
+                              rating={gp.professorRatings[profName] === -1 ? 3 : gp.professorRatings[profName] || 3}
+                              onChange={(rating) => updateProfessorRating(gp.groupId, profName, rating)}
+                              size="16px"
+                            />
+                          )}
+                          <button
+                            onClick={()=>toggleRemoveProfessor(gp.groupId, profName)}
+                            style={{
+                              background: removed ? 'linear-gradient(90deg,#2563eb,#1d4ed8)' : 'linear-gradient(90deg,#dc2626,#b91c1c)',
+                              border:'none',
+                              color:'#fff',
+                              fontSize:'10px',
+                              padding:'4px 8px',
+                              borderRadius:4,
+                              cursor:'pointer',
+                              display:'flex',
+                              alignItems:'center',
+                              gap:4
+                            }}
+                            title={removed ? 'بازگرداندن استاد' : 'حذف استاد از محاسبه'}
+                          >
+                            {removed ? 'بازگردانی' : 'حذف'}
+                          </button>
+                        </div>
                       </div>
-                    ))}
+                        );
+                      })}
                   </div>
 
                   {/* Time Slot Ratings */}
@@ -586,17 +680,11 @@ const PreferencePanel: React.FC<PreferencePanelProps> = ({
                     </h4>
                     {slotEntries
                       .filter(([slotKey]) => {
-                        if (!selectedFaculty) return true;
-                        // اگر دانشکده انتخاب شده، فقط زمان‌هایی که در آن دانشکده استفاده می‌شوند نشان داده شوند
-                        for (const code of courseGroups.find(cg => cg.id === gp.groupId)?.courseCodes || []) {
+                        if (!facultyFilterEnabled || !selectedFaculty || !groupHasFacultyCourses) return true;
+                        for (const code of groupCourseCodes) {
                           const course = courseIndex[code];
                           if (course && course.courseCode && course.courseCode.toString().startsWith(selectedFaculty)) {
-                            if (course.sections.some(s => s.schedule.some(slot => {
-                              const key = `${slot.day}-${slot.start}-${slot.end}`;
-                              return key === slotKey;
-                            }))) {
-                              return true;
-                            }
+                            if (course.sections.some(s => s.schedule.some(slot => `${slot.day}-${slot.start}-${slot.end}` === slotKey))) return true;
                           }
                         }
                         return false;
